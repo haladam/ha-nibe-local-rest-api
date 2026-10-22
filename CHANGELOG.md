@@ -4,6 +4,13 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.11 - 2026-10-22
+
+* Card: the wide layout is scaled to fit the window height, so on a wide, short screen the card no
+  longer needs scrolling (before, its height simply followed its width). The picture keeps its
+  proportions and is centred. `fit_height: false` restores the old behaviour. The phone layout is
+  unchanged.
+
 ## 0.9.10 - 2026-10-22
 
 * Card: the bottom hot water sensor (BT6) is drawn where it really sits, in the outer

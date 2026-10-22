@@ -16,6 +16,7 @@ type: custom:nibe-plant-card
 title: Heating plant              # header above the picture
 layout: auto                      # auto (default), wide or narrow; auto switches below 560 px
 animation: true                   # false switches the moving pipes and fans off
+fit_height: true                  # false lets the wide layout grow to the full card width (taller than a short window)
 device: <device id>               # only if two NIBE heat pumps are set up
 pv:
   power: sensor.pv_power          # PV production, W or kW (the card shows the pump's own PV value without it)
@@ -42,6 +43,10 @@ Slots for `entities`: `outdoor`, `supply`, `return`, `calc_supply`, `calc_supply
 
 Notes
 
+* In the wide layout the picture is scaled down to fit the window height (window height minus 160 px
+  for the header and margins, but never below 380 px), so a wide card does not need scrolling. It
+  keeps its proportions and is centred. `fit_height: false` turns that off. The phone layout always
+  keeps its full height and scrolls.
 * The heating circuit is drawn as underfloor heating. The card only follows the pump's flow
   setting if the entity "Flow setting climate system 1" (point 3976, disabled by default) is
   enabled; otherwise set `circuit.type`.

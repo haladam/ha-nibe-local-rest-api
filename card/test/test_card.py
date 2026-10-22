@@ -24,8 +24,8 @@ READ = """() => {
 }"""
 
 class Page:
-    def __init__(self, browser, scenario="idle", overrides=None, config=None, width=900, lang="en", drop=(), extra=None, mutate=None, errors=None, include=()):
-        self.page = browser.new_page(viewport={"width": width + 40, "height": 1300})
+    def __init__(self, browser, scenario="idle", overrides=None, config=None, width=900, lang="en", drop=(), extra=None, mutate=None, errors=None, include=(), height=1300):
+        self.page = browser.new_page(viewport={"width": width + 40, "height": height})
         self.errors = errors if errors is not None else []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.on("console", lambda m: self.errors.append(m.text) if m.type == "error" else None)
@@ -492,6 +492,24 @@ with sync_playwright() as p:
     check("ceiling cooling emitter is blue", v == BLUE, v)
     pg = Page(browser, "hotwater"); v = pg.page.evaluate("() => window.__card.shadowRoot.querySelector('.npc-jacket').style.fill"); pg.close()
     check("tank jacket turns red while charging", v in ("rgb(239, 68, 68)", RED), v)
+
+    # ---- the wide picture fits the window height, the phone layout may scroll
+    FIT = "() => { const r = window.__card.shadowRoot.querySelector('svg').getBoundingClientRect(); return {w: r.width, h: r.height, bottom: window.__card.getBoundingClientRect().bottom}; }"
+    pg = Page(browser, "heating", width=1800, height=900); f = pg.page.evaluate(FIT); pg.close()
+    check("wide layout, 1800 x 900 window: the picture is scaled to 740 px high (window - 160) and the card ends inside the window",
+          abs(f["h"] - 740) <= 1.5 and f["bottom"] <= 900, f)
+    pg = Page(browser, "heating", width=1800, height=900, config={"type": "custom:nibe-plant-card", "fit_height": False}); f = pg.page.evaluate(FIT); pg.close()
+    check("fit_height: false keeps the full width height (about 1019 px, taller than the window)", abs(f["h"] - f["w"] * 560 / 980) <= 1.5 and f["h"] > 900, f)
+    pg = Page(browser, "heating", width=1800, height=500); f = pg.page.evaluate(FIT); pg.close()
+    check("wide layout in a very short window: never smaller than 380 px high", abs(f["h"] - 380) <= 1.5, f)
+    pg = Page(browser, "heating", width=900, height=1300); f = pg.page.evaluate(FIT); pg.close()
+    check("wide layout in a tall window: no change, the height follows the width", abs(f["h"] - f["w"] * 560 / 980) <= 1.5, f)
+    pg = Page(browser, "heating", width=380, height=600); f = pg.page.evaluate(FIT); pg.close()
+    check("phone layout: not limited by the window height (it scrolls)", abs(f["h"] - f["w"] * 1010 / 480) <= 1.5 and f["h"] > 600, f)
+    pg = Page(browser, "heating", width=1800, height=900, config={"type": "custom:nibe-plant-card", "layout": "narrow"}); f = pg.page.evaluate(FIT); pg.close()
+    check("layout: narrow on a wide screen is not limited either", f["h"] > 900, f)
+    pg = Page(browser, "heating", width=1800, height=900, config={"type": "custom:nibe-plant-card", "fit_height": 0}); f = pg.page.evaluate(FIT); pg.close()
+    check("fit_height: only the value false switches it off (0 does not)", abs(f["h"] - 740) <= 1.5, f)
 
     # ---- clicks open more-info
     pg = Page(browser, "heating")

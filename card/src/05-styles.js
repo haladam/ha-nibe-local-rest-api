@@ -26,6 +26,12 @@ ha-card.npc-has-title { padding-top: 4px; }
   --npc-surface: var(--card-background-color, #fff);
   --npc-panel-bg: rgba(127, 127, 127, 0.10);
 }
+/* wide layout: never taller than the window (room is left for the header and the margins around the card);
+   the picture keeps its proportions and is centred. The floor keeps it readable in a very short window. */
+ha-card.npc-fit .npc-svg {
+  max-height: max(380px, calc(100vh - 160px));
+  max-height: max(380px, calc(100dvh - 160px));
+}
 
 /* panels ---------------------------------------------------------------- */
 .npc-panel { fill: var(--npc-panel-bg); stroke: var(--npc-stroke); stroke-width: 1; }
