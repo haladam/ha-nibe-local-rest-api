@@ -9,10 +9,10 @@
     "@haladam"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/haladam/nibe_local_api_ha",
+  "documentation": "https://github.com/haladam/ha-nibe-local-rest-api",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/haladam/nibe_local_api_ha/issues",
+  "issue_tracker": "https://github.com/haladam/ha-nibe-local-rest-api/issues",
   "requirements": [],
   "version": "0.9.10"
 }

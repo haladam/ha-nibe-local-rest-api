@@ -24,7 +24,7 @@ ships an animated Lovelace overview card, `nibe-plant-card`.
 
 ### HACS (recommended)
 
-1. HACS → ⋮ → **Custom repositories** → add `https://github.com/haladam/nibe_local_api_ha`,
+1. HACS → ⋮ → **Custom repositories** → add `https://github.com/haladam/ha-nibe-local-rest-api`,
    category **Integration**.
 2. Install **NIBE Local REST API** and restart Home Assistant.
 3. Settings → Devices & services → **Add integration** → *NIBE Local REST API*.
