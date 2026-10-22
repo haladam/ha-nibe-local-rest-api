@@ -142,6 +142,66 @@ function drawGround(scene, box, orient) {
   return group;
 }
 
+/**
+ * The compressor, drawn as a scroll compressor: two identical spiral walls, one fixed and one that orbits around
+ * it without turning. Where the walls touch they close off pockets of gas; as the orbiting wall moves on, the
+ * pockets travel towards the middle and shrink, so the gas is squeezed (blue = suction pressure at the rim,
+ * red = discharge pressure at the centre port).
+ *
+ * Both walls are involutes of one circle, so the gap between neighbouring flanks is the same all the way along:
+ * the pitch of the spiral is pi * a on either side, split into the wall and the channel. The orbiting wall is
+ * shifted by exactly that channel width (less a hair line), which is what makes the walls just touch. The motion
+ * is a plain translation along a small circle, run backwards, so the pockets move inwards.
+ *
+ * (NIBE does not state which compressor type the S1155 has; this is the common one for heat pumps of this class.)
+ */
+const SCROLL = { a: 2, wall: 3, from: 1.2, to: 14.5, clearance: 0.3, rim: 40 };
+
+function scrollWall(rotation) {
+  const { a, from, to } = SCROLL;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  let d = "";
+  for (let t = from; t < to + 0.06; t += 0.12) {
+    const x = a * (Math.cos(t) + t * Math.sin(t));
+    const y = a * (Math.sin(t) - t * Math.cos(t));
+    d += `${d ? " L" : "M"} ${(x * cos - y * sin).toFixed(2)} ${(x * sin + y * cos).toFixed(2)}`;
+  }
+  return d;
+}
+
+function drawCompressor(scene, cx, cy) {
+  const orbit = Math.PI * SCROLL.a - SCROLL.wall - SCROLL.clearance;
+  const gasId = `npc-gas-${++uid}`;
+  scene.defs.appendChild(
+    svgEl("radialGradient", { id: gasId }, [
+      svgEl("stop", { offset: "0%", class: "npc-gas-high" }),
+      svgEl("stop", { offset: "100%", class: "npc-gas-low" }),
+    ])
+  );
+  const group = svgEl("g", { class: "npc-compressor" });
+  group.style.setProperty("--npc-orbit", `${orbit.toFixed(2)}px`);
+  const wall = { "stroke-width": SCROLL.wall, fill: "none" };
+  const orbiting = svgEl("g", { class: "npc-orbit" }, [svgEl("path", { d: scrollWall(Math.PI), class: "npc-scroll npc-scroll-orbit", ...wall })]);
+  group.append(
+    svgEl("circle", { cx, cy, r: SCROLL.rim, class: "npc-comp-ring" }),
+    svgEl("g", { transform: `translate(${cx} ${cy})` }, [
+      svgEl("circle", { r: SCROLL.rim - 7, fill: `url(#${gasId})`, class: "npc-gas" }),
+      svgEl("path", { d: scrollWall(0), class: "npc-scroll npc-scroll-fixed", ...wall }),
+      orbiting,
+      svgEl("circle", { r: 1.7, class: "npc-discharge" }),
+    ])
+  );
+  attachMoreInfo(scene, group, "compressor_hz");
+  scene.add((plant) => {
+    group.classList.toggle("npc-running", plant.compressorRunning() === true);
+    // one turn takes longer than the real thing (50 turns a second) by far; faster when the compressor is
+    const hz = plant.num("compressor_hz");
+    orbiting.style.animationDuration = `${hz && hz > 0 ? clamp(2.4 - hz / 60, 0.5, 2.4) : 2}s`;
+  });
+  return group;
+}
+
 /** Heat pump: compressor, mode, power, COP, outside temperature, auxiliary heater. */
 function drawHeatPump(scene, box, name) {
   const group = drawPanel(scene, box, name, { className: "npc-hp" });
@@ -178,27 +238,9 @@ function drawHeatPump(scene, box, name) {
   // compressor
   const cx = box.x + box.w / 2;
   const cy = box.y + 120;
-  const ring = svgEl("g", { class: "npc-compressor" });
-  ring.appendChild(svgEl("circle", { cx, cy, r: 40, class: "npc-comp-ring" }));
-  const arm = (turn) => {
-    let d = "";
-    for (let k = 0; k <= 40; k++) {
-      const a = (k / 40) * Math.PI * 4.2 + turn;
-      const r = 3 + (k / 40) * 27;
-      d += `${k ? " L" : "M"} ${(r * Math.cos(a)).toFixed(2)} ${(r * Math.sin(a)).toFixed(2)}`;
-    }
-    return svgEl("path", { d, class: "npc-scroll", fill: "none" });
-  };
-  const spin = spinner(cx, cy, 34, [arm(0), arm(Math.PI)], "npc-comp-spin");
-  ring.appendChild(spin.outer);
+  const compressor = drawCompressor(scene, cx, cy);
   const label = svgText(cx, cy + 58, scene.t.compressor, { class: "npc-subtitle", "text-anchor": "middle" });
-  group.append(ring, label);
-  attachMoreInfo(scene, ring, "compressor_hz");
-  scene.add((plant) => {
-    ring.classList.toggle("npc-running", plant.compressorRunning() === true);
-    const hz = plant.num("compressor_hz");
-    spin.inner.style.animationDuration = `${hz && hz > 0 ? clamp(2.4 - hz / 60, 0.5, 2.4) : 2}s`;
-  });
+  group.append(compressor, label);
 
   const y1 = box.y + 218;
   const y2 = box.y + 262;

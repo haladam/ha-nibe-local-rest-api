@@ -5,6 +5,14 @@
 
 let uid = 0;
 
+/**
+ * Where one pipe passes under another: the lower pipe is cut open this far to either side of the crossing
+ * point along its own direction (the pipes are 8 wide, so 4 of that is the other pipe and the rest is the gap),
+ * and a little wider than the pipe across it, so the cut is clean.
+ */
+const PIPE_GAP = 11;
+const PIPE_GAP_SIDE = 8;
+
 class Scene {
   constructor(card, plant, width, height) {
     this.card = card;
@@ -124,12 +132,40 @@ function drawBadge(scene, x, y, read, options) {
  * moves. The path direction is the flow direction.
  *
  * options: points, from(plant) / to(plant) temperatures for the colour gradient,
- * fallback colour, active(plant) -> bool, visible(plant) -> bool, energy (thin dashed)
+ * fallback colour, active(plant) -> bool, visible(plant) -> bool, energy (thin dashed),
+ * gaps: [[x, y, axis]] where this pipe passes under another one at (x, y) and runs along `axis` ("x" or
+ * "y"); it is cut open there, so the crossing reads as a bridge and not as a junction
  */
 function drawPipe(scene, options) {
   const d = roundedPath(options.points, options.radius);
   const group = svgEl("g", { class: `npc-pipe-group${options.energy ? " npc-energy" : ""}` });
   const id = `npc-grad-${++uid}`;
+  if (options.gaps && options.gaps.length) {
+    const xs = options.points.map((p) => p[0]);
+    const ys = options.points.map((p) => p[1]);
+    const pad = 16;
+    const x0 = Math.min(...xs) - pad;
+    const y0 = Math.min(...ys) - pad;
+    const w = Math.max(...xs) - x0 + pad;
+    const h = Math.max(...ys) - y0 + pad;
+    // an explicit region: the default one is relative to the bounding box, which has no height for a straight line
+    const cuts = options.gaps.map(([gx, gy, axis]) =>
+      svgEl("rect", {
+        x: axis === "x" ? gx - PIPE_GAP : gx - PIPE_GAP_SIDE,
+        y: axis === "x" ? gy - PIPE_GAP_SIDE : gy - PIPE_GAP,
+        width: axis === "x" ? PIPE_GAP * 2 : PIPE_GAP_SIDE * 2,
+        height: axis === "x" ? PIPE_GAP_SIDE * 2 : PIPE_GAP * 2,
+        fill: "#000",
+      })
+    );
+    scene.defs.appendChild(
+      svgEl("mask", { id: `${id}-mask`, maskUnits: "userSpaceOnUse", x: x0, y: y0, width: w, height: h }, [
+        svgEl("rect", { x: x0, y: y0, width: w, height: h, fill: "#fff" }),
+        ...cuts,
+      ])
+    );
+    group.setAttribute("mask", `url(#${id}-mask)`);
+  }
   const first = options.points[0];
   const last = options.points[options.points.length - 1];
   const stopA = svgEl("stop", { offset: "0%" });

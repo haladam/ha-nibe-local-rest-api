@@ -129,6 +129,7 @@ class NibePlantCard extends HTMLElement {
     const layout = LAYOUTS[this._layout];
     const scene = new Scene(this, this._plant, layout.width, layout.height);
     scene.animation = this._config.animation;
+    scene.svg.classList.toggle("npc-animated", scene.animation !== false);
     layout.build(scene, this._config);
     card.appendChild(scene.svg);
     this._note = document.createElement("div");

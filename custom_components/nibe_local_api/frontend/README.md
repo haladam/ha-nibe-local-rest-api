@@ -15,7 +15,7 @@ Everything below is optional.
 type: custom:nibe-plant-card
 title: Heating plant              # header above the picture
 layout: auto                      # auto (default), wide or narrow; auto switches below 560 px
-animation: true                   # false switches the moving pipes and fans off
+animation: true                   # false switches the moving pipes, fans and compressor off
 fit_height: true                  # false lets the wide layout grow to the full card width (taller than a short window)
 device: <device id>               # only if two NIBE heat pumps are set up
 pv:
@@ -70,6 +70,18 @@ Notes
   has a blue supply and a red return, and with passive cooling two extra lines show cold water
   to the circuit and warm water back. Only the solar line has its own colour (amber). The
   numbers keep a temperature colour scale.
+* With the tank and the heating circuit on the same side of the heat pump, one pipe crossing
+  cannot be avoided: the tank's return has to get past the supply line to the circuit. The card
+  keeps it to that one place and draws it as a bridge (the return passes under the supply, with a
+  gap in it). In passive cooling the circuit is fed from the ground loop alone, so the heating
+  pipes to it are not drawn then.
+* The compressor is drawn as a scroll compressor: a fixed spiral wall and an identical one that
+  orbits around it without turning. Where the walls touch they close off pockets of gas that
+  move towards the middle and shrink, which is how the gas is compressed (blue at the rim,
+  red at the discharge port in the centre). It moves while the compressor runs, faster at a
+  higher frequency, and stands still when it stops. NIBE does not state the compressor type of
+  the S1155 in its documents; a scroll is the usual choice for heat pumps of this size, so
+  take the drawing as a faithful picture of how that kind works, not as a photo of your unit.
 * "Excess solar" is the PV surplus power that was passed to the heat pump (point 14314, enabled
   by default, filled by your own automation). It is replaced by the battery level if `pv.battery` is set.
 * The tank is drawn after the KNV Greenwater: insulation, a domed hot water vessel with cold water

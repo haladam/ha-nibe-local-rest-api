@@ -4,6 +4,23 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.12 - 2026-10-22
+
+* Card: fewer crossing pipes. The heating circuit's supply and return ports are swapped (supply
+  above, return below), so the circuit's return no longer crosses its own supply line. With the tank
+  and the circuit on the same side of the heat pump one crossing cannot be avoided (the tank's
+  return has to pass the supply line to the circuit); it is drawn as a bridge, with a gap in the
+  lower pipe, so it does not look like a junction. The phone layout is rerouted the same way (two
+  crossings down to one). In passive cooling the circuit's heating pipes are no longer drawn, so
+  the cooling lines from and to the ground loop cross nothing.
+* Card: the compressor is drawn as a scroll compressor, a fixed and an orbiting spiral wall with
+  the gas pressure rising from rim to centre, instead of a spinning spiral. The orbiting wall moves
+  on a small circle without turning, in the direction in which the pockets of gas are compressed;
+  it runs while the compressor runs, faster at a higher frequency. (NIBE does not state the
+  compressor type of the S1155; scroll is the usual type for this class.)
+* Card: `animation: false` now also stops the compressor and the pump fans, as the documentation
+  always said (before, it only hid the moving dots in the pipes).
+
 ## 0.9.11 - 2026-10-22
 
 * Card: the wide layout is scaled to fit the window height, so on a wide, short screen the card no

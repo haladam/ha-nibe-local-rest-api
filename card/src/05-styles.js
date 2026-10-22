@@ -3,6 +3,13 @@
  * Styles (adapted from heatpump-flow-card)
  * ========================================================================= */
 
+// sixteen steps round a circle are a close enough circle for an orbit this small (the error is under 0.1 px)
+const ORBIT_KEYFRAMES = Array.from({ length: 17 }, (_, k) => {
+  const angle = -(k / 16) * 2 * Math.PI;
+  const at = (n) => (Math.abs(n) < 1e-9 ? 0 : n).toFixed(4);
+  return `${(k / 16) * 100}% { transform: translate(calc(var(--npc-orbit) * ${at(Math.cos(angle))}), calc(var(--npc-orbit) * ${at(Math.sin(angle))})); }`;
+}).join("\n");
+
 const CARD_STYLES = `
 :host { display: block; }
 ha-card { overflow: hidden; padding: 10px 8px 6px; }
@@ -74,9 +81,23 @@ ha-card.npc-fit .npc-svg {
 
 /* heat pump ------------------------------------------------------------- */
 .npc-comp-ring { fill: var(--npc-surface); stroke: var(--npc-stroke); stroke-width: 1.5; transition: stroke 0.5s ease; }
-.npc-scroll { stroke: var(--npc-muted); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.5s ease; }
-.npc-compressor.npc-running .npc-scroll { stroke: var(--info-color, #39b0e5); }
+.npc-gas-high { stop-color: #ef4444; stop-opacity: 0.6; }
+.npc-gas-low { stop-color: #3b82f6; stop-opacity: 0.28; }
+.npc-gas { opacity: 0.45; transition: opacity 0.5s ease; }
+.npc-scroll { stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.5s ease; }
+.npc-scroll-fixed, .npc-scroll-orbit { stroke: var(--npc-muted); }
+.npc-discharge { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-compressor.npc-running .npc-scroll-orbit { stroke: var(--info-color, #39b0e5); }
 .npc-compressor.npc-running .npc-comp-ring { stroke: var(--info-color, #39b0e5); }
+.npc-compressor.npc-running .npc-gas { opacity: 1; }
+.npc-compressor.npc-running .npc-discharge { fill: #ef4444; }
+/* the orbiting scroll moves on a small circle without turning, against the sense in which the spiral winds out:
+   that is the direction in which the pockets of gas travel inwards and get compressed */
+.npc-orbit { animation: npc-orbit 2s linear infinite; animation-play-state: paused; }
+.npc-running .npc-orbit { animation-play-state: running; }
+@keyframes npc-orbit {
+${ORBIT_KEYFRAMES}
+}
 
 .npc-status { fill: var(--npc-muted); opacity: 0.4; }
 .npc-status-on { fill: var(--success-color, #43a047); opacity: 1; }
@@ -146,6 +167,7 @@ ha-card.npc-fit .npc-svg {
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }
 
 @media (prefers-reduced-motion: reduce) {
-  .npc-spin, .npc-dots, .npc-sun { animation: none !important; }
+  .npc-spin, .npc-orbit, .npc-dots, .npc-sun { animation: none !important; }
 }
+.npc-svg:not(.npc-animated) .npc-spin, .npc-svg:not(.npc-animated) .npc-orbit { animation: none; }
 `;

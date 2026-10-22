@@ -277,14 +277,14 @@ with sync_playwright() as p:
     check("cooling: clicking Target opens the cooling supply entity", pg.page.evaluate("window.__moreInfo") == [by_point(pg.states, 2695)], pg.page.evaluate("window.__moreInfo"))
     cool_pipes = pg.page.evaluate(VIS); pg.close()
     pg = Page(browser, "heating"); heat_pipes = pg.page.evaluate(VIS)
-    check("heating: the two passive cooling pipes (cold out, warm back) are hidden (wide)", cool_pipes == heat_pipes + 2, (cool_pipes, heat_pipes))
+    check("heating: the two passive cooling pipes (cold out, warm back) are hidden, in passive cooling they replace the two heating pipes of the circuit (wide)", cool_pipes == heat_pipes, (cool_pipes, heat_pipes))
     pg.page.evaluate("window.__moreInfo.length = 0")
     pg.page.evaluate("""() => { [...window.__card.shadowRoot.querySelectorAll('.npc-readout')].find(r => r.querySelector('text').textContent === 'Target').dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true})); }""")
     check("heating: Target opens the heating curve entity (point 1708)", pg.page.evaluate("window.__moreInfo") == [by_point(pg.states, 1708)], pg.page.evaluate("window.__moreInfo"))
     check("heating: emitter drawing is the underfloor one", pg.page.evaluate(EMIT) == ["", "none", "none", "none"], pg.page.evaluate(EMIT)); pg.close()
     pg = Page(browser, "cooling", width=380); n_cool = pg.page.evaluate(VIS); pg.close()
     pg = Page(browser, "heating", width=380); n_heat = pg.page.evaluate(VIS); pg.close()
-    check("phone layout: the two cooling pipes along the right edge appear in cooling only", n_cool == n_heat + 2, (n_cool, n_heat))
+    check("phone layout: the two cooling pipes along the right edge appear in cooling only, in place of the circuit's two heating pipes", n_cool == n_heat, (n_cool, n_heat))
     pg = Page(browser, "cooling", lang="de"); check("German: Deckenkühlung / Passive Kühlung", {"Deckenkühlung", "Passive Kühlung"} <= set(pg.read()["texts"]), pg.read()["texts"]); pg.close()
     pg = Page(browser, "cooling", config={"type": "custom:nibe-plant-card", "circuit": {"cooling_type": "same"}})
     check("circuit.cooling_type: same keeps the heating drawing and title in summer", "Underfloor heating" in pg.read()["texts"] and pg.page.evaluate(EMIT) == ["", "none", "none", "none"], pg.read()["texts"]); pg.close()
@@ -318,7 +318,7 @@ with sync_playwright() as p:
                         seen.add(b); todo.append(b)
         return any(abs(g[0] - goal[0]) <= 1 and abs(g[1] - goal[1]) <= 1 for g in seen)
     # (hp supply port, hp return port, circuit supply, circuit return, tank supply, tank return)
-    PORTS = {900: ((630, 170), (630, 340), (700, 457), (700, 412), (778, 129), (778, 244)),
+    PORTS = {900: ((630, 170), (630, 340), (700, 412), (700, 457), (778, 129), (778, 244)),
              380: ((260, 570), (340, 570), (290, 684), (380, 684), (66, 760), (66, 868))}
     for width, (hp_s, hp_r, c_s, c_r, t_s, t_r) in PORTS.items():
         lay = "wide" if width == 900 else "phone"
@@ -334,7 +334,7 @@ with sync_playwright() as p:
 
     # ---- the emitter pipe is one continuous line from the supply port to the return port, like the ground loop
     # (heat pump supply, heat pump return, circuit supply port, circuit return port, ground port of the cold passive pipe, ground port of the warm one)
-    LOOP = {900: ("wide", (630, 170), (630, 340), (700, 457), (700, 412), (220, 520), (220, 497)),
+    LOOP = {900: ("wide", (630, 170), (630, 340), (700, 412), (700, 457), (220, 497), (220, 520)),
             380: ("phone", (260, 570), (340, 570), (290, 684), (380, 684), (430, 160), (430, 130))}
     for width, (lay, hp_s, hp_r, c_s, c_r, g_c, g_w) in LOOP.items():
         for typ in ("underfloor", "radiator", "both"):
@@ -379,12 +379,12 @@ with sync_playwright() as p:
         return None if p is None else (p["c0"], p["c1"])
     # name -> (from, to) for the wide layout and for the phone layout
     LINES = {
-        900: dict(trunk_s=((630, 170), (690, 170)), tank_s=((690, 170), (778, 129)), circ_s=((690, 170), (700, 457)),
-                  trunk_r=((645, 340), (630, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 412), (645, 340)),
+        900: dict(trunk_s=((630, 170), (690, 170)), tank_s=((690, 170), (778, 129)), circ_s=((690, 170), (700, 412)),
+                  trunk_r=((645, 340), (630, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 457), (645, 340)),
                   to_ground=((360, 365), (220, 365)), from_ground=((220, 410), (360, 410)),
-                  cool_s=((220, 520), (700, 457)), cool_r=((700, 412), (220, 497))),
-        380: dict(trunk_s=((260, 570), (260, 618)), tank_s=((260, 618), (66, 760)), circ_s=((260, 618), (290, 684)),
-                  trunk_r=((340, 648), (340, 570)), tank_r=((66, 868), (340, 648)), circ_r=((380, 684), (340, 648)),
+                  cool_s=((220, 497), (700, 412)), cool_r=((700, 457), (220, 520))),
+        380: dict(trunk_s=((260, 570), (260, 644)), tank_s=((260, 644), (66, 760)), circ_s=((260, 644), (290, 684)),
+                  trunk_r=((340, 588), (340, 570)), tank_r=((66, 868), (340, 588)), circ_r=((380, 684), (340, 588)),
                   to_ground=((305, 270), (305, 200)), from_ground=((350, 200), (350, 270)),
                   cool_s=((430, 160), (290, 684)), cool_r=((380, 684), (430, 130))),
     }
@@ -395,7 +395,7 @@ with sync_playwright() as p:
             ("heating", {}, dict(trunk_s=RED, circ_s=RED, trunk_r=BLUE, circ_r=BLUE, to_ground=BLUE, from_ground=RED)),
             ("hotwater", {}, dict(trunk_s=RED, tank_s=RED, trunk_r=BLUE, tank_r=BLUE, to_ground=BLUE, from_ground=RED)),
             ("idle", {}, dict(trunk_s=RED, circ_s=RED, tank_s=RED, trunk_r=BLUE, circ_r=BLUE, tank_r=BLUE, to_ground=BLUE, from_ground=RED)),
-            ("cooling", {}, dict(circ_s=BLUE, circ_r=RED, to_ground=RED, from_ground=BLUE, cool_s=BLUE, cool_r=RED)),
+            ("cooling", {}, dict(to_ground=RED, from_ground=BLUE, cool_s=BLUE, cool_r=RED)),
             ("cooling", {1799: 40, 1973: 1}, dict(trunk_s=BLUE, circ_s=BLUE, trunk_r=RED, circ_r=RED, to_ground=RED, from_ground=BLUE)),
             ("cooling", {1799: 40, 1973: 1, 2002: 1, 1758: 20}, dict(trunk_s=RED, tank_s=RED, trunk_r=BLUE, tank_r=BLUE)),
         ):
@@ -407,6 +407,9 @@ with sync_playwright() as p:
             check(f"{kind}, {lay} layout: pipes {', '.join(sorted(expect))} have the right warm / cold colour", not bad, bad)
         pg = Page(browser, "heating", width=width); pipes = pg.page.evaluate(PIPES); pg.close()
         check(f"heating, {lay} layout: passive cooling pipes are not drawn", find(pipes, *L["cool_s"]) is None and find(pipes, *L["cool_r"]) is None)
+        pg = Page(browser, "cooling", width=width); pipes = pg.page.evaluate(PIPES); pg.close()
+        check(f"passive cooling, {lay} layout: the circuit is fed by the ground loop alone, the heating pipes to it are not drawn",
+              find(pipes, *L["circ_s"]) is None and find(pipes, *L["circ_r"]) is None and find(pipes, *L["cool_s"]) is not None and find(pipes, *L["cool_r"]) is not None)
     pg = Page(browser, "heating", extra={"sensor.pv": {"entity_id": "sensor.pv", "state": "2000", "attributes": {"unit_of_measurement": "W"}}}, config={"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv"}})
     pipes = pg.page.evaluate(PIPES); pg.close()
     check("the solar line keeps its own colour (amber)", colour(pipes, (220, 95), (495, 140)) == (AMBER, AMBER), [p for p in pipes if p["a"] == [220, 95]])
@@ -468,9 +471,104 @@ with sync_playwright() as p:
         for (let l = 0; l <= n; l += 2) min = Math.min(min, p.getPointAtLength(l).x);
         return {a: [Math.round(a.x), Math.round(a.y)], minX: Math.round(min)}; })"""
     pg = Page(browser, "hotwater", width=380); lanes = pg.page.evaluate(LANES); pg.close()
-    ret = [p for p in lanes if p["a"] == [66, 868]]; sup = [p for p in lanes if p["a"] == [260, 618] and p["minX"] < 100]
-    check("phone layout: the tank's return runs on the outer lane and the supply on the inner one, 12 px or more apart (they cross only once)",
+    ret = [p for p in lanes if p["a"] == [66, 868]]; sup = [p for p in lanes if p["a"] == [260, 644] and p["minX"] < 100]
+    check("phone layout: the tank's return runs on the outer lane and the supply on the inner one, 12 px or more apart (so they do not cross there)",
           len(ret) == 1 and len(sup) == 1 and ret[0]["minX"] + 12 <= sup[0]["minX"], (ret, sup))
+
+    # ---- crossings: with two consumers on one side of the heat pump one crossing cannot be avoided, but never more,
+    # and wherever two visible pipes cross, the lower one is cut open so it reads as a bridge and not as a junction
+    CROSSINGS = """() => {
+      const root = window.__card.shadowRoot;
+      const groups = [...root.querySelectorAll('.npc-pipe-group')].filter(g => g.style.display !== 'none');
+      const lines = groups.map(g => { const p = g.querySelector('.npc-pipe'), n = p.getTotalLength(), pts = [];
+        for (let l = 0; l <= n; l += 1) { const q = p.getPointAtLength(l); pts.push([q.x, q.y]); }
+        const last = p.getPointAtLength(n); pts.push([last.x, last.y]); return pts; });
+      const cut = (g, x, y) => { const m = g.getAttribute('mask'); if (!m) return false;
+        const mask = root.getElementById ? root.getElementById(m.slice(5, -1)) : root.querySelector('#' + m.slice(5, -1));
+        return [...mask.querySelectorAll('rect')].filter(r => r.getAttribute('fill') === '#000').some(r => {
+          const rx = +r.getAttribute('x'), ry = +r.getAttribute('y'), rw = +r.getAttribute('width'), rh = +r.getAttribute('height');
+          return x >= rx && x <= rx + rw && y >= ry && y <= ry + rh; }); };
+      const found = [];
+      for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
+        for (let a = 0; a + 1 < lines[i].length; a++) for (let b = 0; b + 1 < lines[j].length; b++) {
+          const [p1, p2, p3, p4] = [lines[i][a], lines[i][a + 1], lines[j][b], lines[j][b + 1]];
+          const d = (p2[0] - p1[0]) * (p4[1] - p3[1]) - (p2[1] - p1[1]) * (p4[0] - p3[0]);
+          if (Math.abs(d) < 1e-9) continue;
+          const t = ((p3[0] - p1[0]) * (p4[1] - p3[1]) - (p3[1] - p1[1]) * (p4[0] - p3[0])) / d;
+          const u = ((p3[0] - p1[0]) * (p2[1] - p1[1]) - (p3[1] - p1[1]) * (p2[0] - p1[0])) / d;
+          if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+          const x = p1[0] + t * (p2[0] - p1[0]), y = p1[1] + t * (p2[1] - p1[1]);
+          // pipes that join end to end (or in a T) meet at the end of a pipe; that is a junction, not a crossing
+          if ([i, j].some(k => [lines[k][0], lines[k][lines[k].length - 1]].some(e => Math.hypot(e[0] - x, e[1] - y) < 1.5))) continue;
+          // the same crossing is found in neighbouring segments; keep one per pair of pipes and place
+          if (!found.some(f => f.i === i && f.j === j && Math.hypot(f.x - x, f.y - y) < 6))
+            found.push({i, j, x: Math.round(x), y: Math.round(y), cut: cut(groups[i], x, y) || cut(groups[j], x, y)});
+        } } return found; }"""
+    for width, lay in ((900, "wide"), (380, "phone")):
+        for sc, over in (("heating", {}), ("hotwater", {}), ("idle", {}), ("cooling", {}), ("cooling", {1799: 40, 1973: 1}), ("boost", {})):
+            pg = Page(browser, sc, overrides=over, width=width); cr = pg.page.evaluate(CROSSINGS); pg.close()
+            kind = "active cooling" if over else ("passive cooling" if sc == "cooling" else sc)
+            # the wide layout drops the circuit's supply lane in passive cooling, so nothing is left to cross; on the
+            # phone the tank's return still passes the supply line from the heat pump
+            none = sc == "cooling" and not over and width == 900
+            check(f"{kind}, {lay} layout: {'the pipes do not cross' if none else 'one crossing at most'}", len(cr) <= (0 if none else 1), cr)
+            check(f"{kind}, {lay} layout: every crossing is a bridge (the lower pipe is cut open)", all(c["cut"] for c in cr), cr)
+    pg = Page(browser, "heating", width=900); cr = pg.page.evaluate(CROSSINGS); pg.close()
+    check("wide layout: the one crossing is where the tank's return passes the supply line to the heating circuit", len(cr) == 1 and (cr[0]["x"], cr[0]["y"]) == (690, 244), cr)
+    pg = Page(browser, "heating", width=380); cr = pg.page.evaluate(CROSSINGS); pg.close()
+    check("phone layout: the one crossing is where the tank's return passes the supply line, clear of the circulation pump", len(cr) == 1 and (cr[0]["x"], cr[0]["y"]) == (260, 588), cr)
+    # the circuit's own pipe has no crossing (the old layout swapped supply and return ports)
+    pg = Page(browser, "heating", width=900); sw = pg.page.evaluate("""() => { const r = window.__card.shadowRoot.querySelector('.npc-pipes'); return [...r.querySelectorAll('.npc-pipe-group[mask]')].length; }"""); pg.close()
+    check("wide layout: only one pipe is cut open", sw == 1, sw)
+
+    # ---- compressor: a scroll compressor, one spiral wall fixed and an identical one orbiting around it
+    SCROLL = r"""async () => {
+      const root = window.__card.shadowRoot, comp = root.querySelector('.npc-compressor');
+      const fixed = comp.querySelector('.npc-scroll-fixed'), orb = comp.querySelector('.npc-orbit'), moving = comp.querySelector('.npc-scroll-orbit');
+      const pts = (p) => [...p.getAttribute('d').matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map(m => [+m[1], +m[2]]);
+      const A = pts(fixed), B = pts(moving), wall = +fixed.getAttribute('stroke-width');
+      const radius = parseFloat(getComputedStyle(comp).getPropertyValue('--npc-orbit'));
+      // the orbiting wall is the fixed one turned by half a turn
+      const half = Math.max(...A.map((p, k) => Math.hypot(-p[0] - B[k][0], -p[1] - B[k][1])));
+      const seg = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
+        const t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0; return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+      const near = (P, Q) => Math.min(...P.map(p => Math.min(...Q.slice(1).map((q, k) => seg(p, Q[k], q)))));
+      const gaps = [];
+      for (let deg = 0; deg < 360; deg += 30) {
+        const v = [radius * Math.cos(deg * Math.PI / 180), radius * Math.sin(deg * Math.PI / 180)];
+        const T = B.map(p => [p[0] + v[0], p[1] + v[1]]);
+        gaps.push(Math.min(near(A, T), near(T, A)));
+      }
+      const samples = [];
+      for (let i = 0; i < 5; i++) { const m = new DOMMatrix(getComputedStyle(orb).transform);
+        samples.push({r: Math.hypot(m.e, m.f), angle: Math.atan2(m.f, m.e), a: m.a, b: m.b}); await new Promise(r => setTimeout(r, 200)); }
+      const cs = getComputedStyle(orb);
+      return {wall, radius, half, gaps, samples, state: cs.animationPlayState, name: cs.animationName, duration: parseFloat(orb.style.animationDuration), points: A.length,
+              impeller: getComputedStyle(root.querySelector('.npc-impeller')).animationName, gas: !!comp.querySelector('.npc-gas'), port: !!comp.querySelector('.npc-discharge')};
+    }"""
+    pg = Page(browser, "heating"); sc = pg.page.evaluate(SCROLL); pg.close()
+    check("compressor: a fixed and an orbiting spiral wall, a gas pressure gradient and a discharge port", sc["points"] > 60 and sc["gas"] and sc["port"], sc["points"])
+    check("compressor: the orbiting wall is the fixed one turned by half a turn", sc["half"] < 0.02, sc["half"])
+    gap = sc["wall"] + 0.3
+    check("compressor: the walls touch at every orbit position and never overlap (spacing = wall + a hair line)", all(gap - 0.12 <= g <= gap + 0.12 for g in sc["gaps"]), (gap, [round(g, 2) for g in sc["gaps"]]))
+    check("compressor: the orbit radius is the channel width between the walls (pi * a - wall - hair line)", abs(sc["radius"] - (3.14159265 * 2 - sc["wall"] - 0.3)) < 0.01, sc["radius"])
+    check("compressor (running): the orbiting wall runs", sc["state"] == "running" and sc["name"] == "npc-orbit", (sc["state"], sc["name"]))
+    check("compressor (running): the wall moves on a circle of the orbit radius without turning", all(abs(x["r"] - sc["radius"]) < 0.12 and abs(x["a"] - 1) < 1e-6 and abs(x["b"]) < 1e-6 for x in sc["samples"]), sc["samples"])
+    import math
+    turn = [(sc["samples"][k + 1]["angle"] - sc["samples"][k]["angle"] + math.pi) % (2 * math.pi) - math.pi for k in range(4)]
+    check("compressor (running): the orbit turns against the winding of the spiral, which is the direction that compresses", all(t < 0 for t in turn), turn)
+    check("compressor (52 Hz): one orbit takes 1.53 s", abs(sc["duration"] - (2.4 - 52 / 60)) < 0.01, sc["duration"])
+    pg = Page(browser, "heating", overrides={1799: 90}); sc90 = pg.page.evaluate(SCROLL); pg.close()
+    check("compressor: faster at a higher frequency, but never faster than 0.5 s per orbit", sc90["duration"] < sc["duration"] and sc90["duration"] >= 0.5, (sc["duration"], sc90["duration"]))
+    pg = Page(browser, "idle"); sci = pg.page.evaluate(SCROLL); pg.close()
+    check("compressor (stopped): the orbiting wall stands still", sci["state"] == "paused" and all(abs(x["angle"] - sci["samples"][0]["angle"]) < 1e-6 for x in sci["samples"]), (sci["state"], sci["samples"]))
+    pg = Page(browser, "heating", config={"type": "custom:nibe-plant-card", "animation": False}); sca = pg.page.evaluate(SCROLL); pg.close()
+    check("animation: false stops the compressor and the pump impellers as well as the moving pipes", sca["name"] == "none" and sca["impeller"] == "none" and sc["impeller"] != "none", (sca["name"], sca["impeller"], sc["impeller"]))
+    pg = Page(browser, "heating"); pg.page.emulate_media(reduced_motion="reduce"); name = pg.page.evaluate("() => getComputedStyle(window.__card.shadowRoot.querySelector('.npc-orbit')).animationName"); pg.close()
+    check("prefers-reduced-motion stops the compressor", name == "none", name)
+    pg = Page(browser, "heating"); pg.page.evaluate("window.__moreInfo.length = 0")
+    pg.page.evaluate("() => window.__card.shadowRoot.querySelector('.npc-compressor').dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}))")
+    check("compressor: clicking it opens the frequency entity", pg.page.evaluate("window.__moreInfo") == [by_point(pg.states, 1799)], pg.page.evaluate("window.__moreInfo")); pg.close()
     stops = []
     for bt6 in (20.0, 60.0):
         pg = Page(browser, "heating", overrides={12: bt6}); stops.append(pg.page.evaluate(TANK)["vesselStops"]); pg.close()

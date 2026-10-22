@@ -512,6 +512,14 @@ function fmt(hass, value, decimals, unit) {
 
 let uid = 0;
 
+/**
+ * Where one pipe passes under another: the lower pipe is cut open this far to either side of the crossing
+ * point along its own direction (the pipes are 8 wide, so 4 of that is the other pipe and the rest is the gap),
+ * and a little wider than the pipe across it, so the cut is clean.
+ */
+const PIPE_GAP = 11;
+const PIPE_GAP_SIDE = 8;
+
 class Scene {
   constructor(card, plant, width, height) {
     this.card = card;
@@ -631,12 +639,40 @@ function drawBadge(scene, x, y, read, options) {
  * moves. The path direction is the flow direction.
  *
  * options: points, from(plant) / to(plant) temperatures for the colour gradient,
- * fallback colour, active(plant) -> bool, visible(plant) -> bool, energy (thin dashed)
+ * fallback colour, active(plant) -> bool, visible(plant) -> bool, energy (thin dashed),
+ * gaps: [[x, y, axis]] where this pipe passes under another one at (x, y) and runs along `axis` ("x" or
+ * "y"); it is cut open there, so the crossing reads as a bridge and not as a junction
  */
 function drawPipe(scene, options) {
   const d = roundedPath(options.points, options.radius);
   const group = svgEl("g", { class: `npc-pipe-group${options.energy ? " npc-energy" : ""}` });
   const id = `npc-grad-${++uid}`;
+  if (options.gaps && options.gaps.length) {
+    const xs = options.points.map((p) => p[0]);
+    const ys = options.points.map((p) => p[1]);
+    const pad = 16;
+    const x0 = Math.min(...xs) - pad;
+    const y0 = Math.min(...ys) - pad;
+    const w = Math.max(...xs) - x0 + pad;
+    const h = Math.max(...ys) - y0 + pad;
+    // an explicit region: the default one is relative to the bounding box, which has no height for a straight line
+    const cuts = options.gaps.map(([gx, gy, axis]) =>
+      svgEl("rect", {
+        x: axis === "x" ? gx - PIPE_GAP : gx - PIPE_GAP_SIDE,
+        y: axis === "x" ? gy - PIPE_GAP_SIDE : gy - PIPE_GAP,
+        width: axis === "x" ? PIPE_GAP * 2 : PIPE_GAP_SIDE * 2,
+        height: axis === "x" ? PIPE_GAP_SIDE * 2 : PIPE_GAP * 2,
+        fill: "#000",
+      })
+    );
+    scene.defs.appendChild(
+      svgEl("mask", { id: `${id}-mask`, maskUnits: "userSpaceOnUse", x: x0, y: y0, width: w, height: h }, [
+        svgEl("rect", { x: x0, y: y0, width: w, height: h, fill: "#fff" }),
+        ...cuts,
+      ])
+    );
+    group.setAttribute("mask", `url(#${id}-mask)`);
+  }
   const first = options.points[0];
   const last = options.points[options.points.length - 1];
   const stopA = svgEl("stop", { offset: "0%" });
@@ -879,6 +915,66 @@ function drawGround(scene, box, orient) {
   return group;
 }
 
+/**
+ * The compressor, drawn as a scroll compressor: two identical spiral walls, one fixed and one that orbits around
+ * it without turning. Where the walls touch they close off pockets of gas; as the orbiting wall moves on, the
+ * pockets travel towards the middle and shrink, so the gas is squeezed (blue = suction pressure at the rim,
+ * red = discharge pressure at the centre port).
+ *
+ * Both walls are involutes of one circle, so the gap between neighbouring flanks is the same all the way along:
+ * the pitch of the spiral is pi * a on either side, split into the wall and the channel. The orbiting wall is
+ * shifted by exactly that channel width (less a hair line), which is what makes the walls just touch. The motion
+ * is a plain translation along a small circle, run backwards, so the pockets move inwards.
+ *
+ * (NIBE does not state which compressor type the S1155 has; this is the common one for heat pumps of this class.)
+ */
+const SCROLL = { a: 2, wall: 3, from: 1.2, to: 14.5, clearance: 0.3, rim: 40 };
+
+function scrollWall(rotation) {
+  const { a, from, to } = SCROLL;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  let d = "";
+  for (let t = from; t < to + 0.06; t += 0.12) {
+    const x = a * (Math.cos(t) + t * Math.sin(t));
+    const y = a * (Math.sin(t) - t * Math.cos(t));
+    d += `${d ? " L" : "M"} ${(x * cos - y * sin).toFixed(2)} ${(x * sin + y * cos).toFixed(2)}`;
+  }
+  return d;
+}
+
+function drawCompressor(scene, cx, cy) {
+  const orbit = Math.PI * SCROLL.a - SCROLL.wall - SCROLL.clearance;
+  const gasId = `npc-gas-${++uid}`;
+  scene.defs.appendChild(
+    svgEl("radialGradient", { id: gasId }, [
+      svgEl("stop", { offset: "0%", class: "npc-gas-high" }),
+      svgEl("stop", { offset: "100%", class: "npc-gas-low" }),
+    ])
+  );
+  const group = svgEl("g", { class: "npc-compressor" });
+  group.style.setProperty("--npc-orbit", `${orbit.toFixed(2)}px`);
+  const wall = { "stroke-width": SCROLL.wall, fill: "none" };
+  const orbiting = svgEl("g", { class: "npc-orbit" }, [svgEl("path", { d: scrollWall(Math.PI), class: "npc-scroll npc-scroll-orbit", ...wall })]);
+  group.append(
+    svgEl("circle", { cx, cy, r: SCROLL.rim, class: "npc-comp-ring" }),
+    svgEl("g", { transform: `translate(${cx} ${cy})` }, [
+      svgEl("circle", { r: SCROLL.rim - 7, fill: `url(#${gasId})`, class: "npc-gas" }),
+      svgEl("path", { d: scrollWall(0), class: "npc-scroll npc-scroll-fixed", ...wall }),
+      orbiting,
+      svgEl("circle", { r: 1.7, class: "npc-discharge" }),
+    ])
+  );
+  attachMoreInfo(scene, group, "compressor_hz");
+  scene.add((plant) => {
+    group.classList.toggle("npc-running", plant.compressorRunning() === true);
+    // one turn takes longer than the real thing (50 turns a second) by far; faster when the compressor is
+    const hz = plant.num("compressor_hz");
+    orbiting.style.animationDuration = `${hz && hz > 0 ? clamp(2.4 - hz / 60, 0.5, 2.4) : 2}s`;
+  });
+  return group;
+}
+
 /** Heat pump: compressor, mode, power, COP, outside temperature, auxiliary heater. */
 function drawHeatPump(scene, box, name) {
   const group = drawPanel(scene, box, name, { className: "npc-hp" });
@@ -915,27 +1011,9 @@ function drawHeatPump(scene, box, name) {
   // compressor
   const cx = box.x + box.w / 2;
   const cy = box.y + 120;
-  const ring = svgEl("g", { class: "npc-compressor" });
-  ring.appendChild(svgEl("circle", { cx, cy, r: 40, class: "npc-comp-ring" }));
-  const arm = (turn) => {
-    let d = "";
-    for (let k = 0; k <= 40; k++) {
-      const a = (k / 40) * Math.PI * 4.2 + turn;
-      const r = 3 + (k / 40) * 27;
-      d += `${k ? " L" : "M"} ${(r * Math.cos(a)).toFixed(2)} ${(r * Math.sin(a)).toFixed(2)}`;
-    }
-    return svgEl("path", { d, class: "npc-scroll", fill: "none" });
-  };
-  const spin = spinner(cx, cy, 34, [arm(0), arm(Math.PI)], "npc-comp-spin");
-  ring.appendChild(spin.outer);
+  const compressor = drawCompressor(scene, cx, cy);
   const label = svgText(cx, cy + 58, scene.t.compressor, { class: "npc-subtitle", "text-anchor": "middle" });
-  group.append(ring, label);
-  attachMoreInfo(scene, ring, "compressor_hz");
-  scene.add((plant) => {
-    ring.classList.toggle("npc-running", plant.compressorRunning() === true);
-    const hz = plant.num("compressor_hz");
-    spin.inner.style.animationDuration = `${hz && hz > 0 ? clamp(2.4 - hz / 60, 0.5, 2.4) : 2}s`;
-  });
+  group.append(compressor, label);
 
   const y1 = box.y + 218;
   const y2 = box.y + 262;
@@ -1297,6 +1375,13 @@ function drawValve(scene, cx, cy) {
  * Styles (adapted from heatpump-flow-card)
  * ========================================================================= */
 
+// sixteen steps round a circle are a close enough circle for an orbit this small (the error is under 0.1 px)
+const ORBIT_KEYFRAMES = Array.from({ length: 17 }, (_, k) => {
+  const angle = -(k / 16) * 2 * Math.PI;
+  const at = (n) => (Math.abs(n) < 1e-9 ? 0 : n).toFixed(4);
+  return `${(k / 16) * 100}% { transform: translate(calc(var(--npc-orbit) * ${at(Math.cos(angle))}), calc(var(--npc-orbit) * ${at(Math.sin(angle))})); }`;
+}).join("\n");
+
 const CARD_STYLES = `
 :host { display: block; }
 ha-card { overflow: hidden; padding: 10px 8px 6px; }
@@ -1368,9 +1453,23 @@ ha-card.npc-fit .npc-svg {
 
 /* heat pump ------------------------------------------------------------- */
 .npc-comp-ring { fill: var(--npc-surface); stroke: var(--npc-stroke); stroke-width: 1.5; transition: stroke 0.5s ease; }
-.npc-scroll { stroke: var(--npc-muted); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.5s ease; }
-.npc-compressor.npc-running .npc-scroll { stroke: var(--info-color, #39b0e5); }
+.npc-gas-high { stop-color: #ef4444; stop-opacity: 0.6; }
+.npc-gas-low { stop-color: #3b82f6; stop-opacity: 0.28; }
+.npc-gas { opacity: 0.45; transition: opacity 0.5s ease; }
+.npc-scroll { stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.5s ease; }
+.npc-scroll-fixed, .npc-scroll-orbit { stroke: var(--npc-muted); }
+.npc-discharge { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-compressor.npc-running .npc-scroll-orbit { stroke: var(--info-color, #39b0e5); }
 .npc-compressor.npc-running .npc-comp-ring { stroke: var(--info-color, #39b0e5); }
+.npc-compressor.npc-running .npc-gas { opacity: 1; }
+.npc-compressor.npc-running .npc-discharge { fill: #ef4444; }
+/* the orbiting scroll moves on a small circle without turning, against the sense in which the spiral winds out:
+   that is the direction in which the pockets of gas travel inwards and get compressed */
+.npc-orbit { animation: npc-orbit 2s linear infinite; animation-play-state: paused; }
+.npc-running .npc-orbit { animation-play-state: running; }
+@keyframes npc-orbit {
+${ORBIT_KEYFRAMES}
+}
 
 .npc-status { fill: var(--npc-muted); opacity: 0.4; }
 .npc-status-on { fill: var(--success-color, #43a047); opacity: 1; }
@@ -1440,8 +1539,9 @@ ha-card.npc-fit .npc-svg {
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }
 
 @media (prefers-reduced-motion: reduce) {
-  .npc-spin, .npc-dots, .npc-sun { animation: none !important; }
+  .npc-spin, .npc-orbit, .npc-dots, .npc-sun { animation: none !important; }
 }
+.npc-svg:not(.npc-animated) .npc-spin, .npc-svg:not(.npc-animated) .npc-orbit { animation: none; }
 `;
 
 /* =========================================================================
@@ -1490,26 +1590,37 @@ function buildWide(scene, cfg) {
 
   // the tank: supply from the heat pump at its upper left port, return from its bottom left port
   const tankAt = tankGeometry(tank, false);
-  // the heating circuit: the water enters its panel at the lower end of the left edge and leaves at the upper end
-  const gate = { edge: "left", supply: [circuit.x, 457], ret: [circuit.x, 412] };
+  // the heating circuit: the water enters its panel at the upper end of the left edge and leaves at the lower
+  // one. That way the circuit's return does not have to cross its own supply on the way to the heat pump.
+  const gate = { edge: "left", supply: [circuit.x, 412], ret: [circuit.x, 457] };
+  // passive cooling: the circuit is fed from the ground loop and the heat pump takes no part
+  const passive = (p) => p.cooling() && !p.activeCooling();
+  const notPassive = (p) => !passive(p);
 
   // returns: one branch per consumer, joined in a common line into the heat pump
   const returning = (plant) => hotWater(plant) || heating(plant);
-  drawPipe(scene, { points: [[tankAt.x, tankAt.returnY], [645, tankAt.returnY], [645, 340]], tone: TONES.cold, active: hotWater });
-  drawPipe(scene, { points: [gate.ret, [645, gate.ret[1]], [645, 340]], tone: TONES.circuitReturn, active: heating });
+  // The tank's return has to get from the right of the circuit's supply lane to the heat pump on its left. With two
+  // consumers on the same side of the heat pump one crossing cannot be avoided, so this pipe passes under the lane.
+  drawPipe(scene, {
+    points: [[tankAt.x, tankAt.returnY], [645, tankAt.returnY], [645, 340]],
+    tone: TONES.cold,
+    active: hotWater,
+    gaps: [[690, tankAt.returnY, "x"]],
+  });
+  drawPipe(scene, { points: [gate.ret, [645, gate.ret[1]], [645, 340]], tone: TONES.circuitReturn, active: heating, visible: notPassive });
   drawPipe(scene, { points: [[645, 340], [630, 340]], tone: TONES.returnTrunk, active: returning });
   drawPipe(scene, { points: [[630, 170], [690, 170]], tone: TONES.supplyTrunk, active: heatDelivering });
   drawPipe(scene, { points: [[690, 170], [690, tankAt.supplyY], [tankAt.x, tankAt.supplyY]], tone: TONES.warm, active: hotWater });
-  drawPipe(scene, { points: [[690, 170], [690, gate.supply[1]], gate.supply], tone: TONES.circuitSupply, active: heating });
+  drawPipe(scene, { points: [[690, 170], [690, gate.supply[1]], gate.supply], tone: TONES.circuitSupply, active: heating, visible: notPassive });
 
   drawPipe(scene, { points: [[360, 365], [220, 365]], tone: TONES.toGround, active: gp2 });
   drawPipe(scene, { points: [[220, 410], [360, 410]], tone: TONES.fromGround, active: gp2 });
-  // passive cooling: cold ground water runs into the circuit's supply port, the warm water leaves at its
-  // return port and goes back to the ground loop
-  const passive = (p) => p.cooling() && !p.activeCooling();
+  // passive cooling: cold ground water runs into the circuit's supply port (the upper one), the warm water
+  // leaves at its return port and goes back to the ground loop. The cold line takes the outer lane, so the
+  // two do not cross.
   const coolingPump = (p) => p.on("cooling_pump") === true;
-  drawPipe(scene, { points: [gate.ret, [672, gate.ret[1]], [672, 497], [220, 497]], tone: TONES.warm, visible: passive, active: coolingPump });
-  drawPipe(scene, { points: [[220, 520], [690, 520], [690, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [[220, 497], [672, 497], [672, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [gate.ret, [690, gate.ret[1]], [690, 520], [220, 520]], tone: TONES.warm, visible: passive, active: coolingPump });
 
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
@@ -1559,21 +1670,33 @@ function buildNarrow(scene, cfg) {
 
   // returns first, supplies on top
   const returning = (plant) => hotWater(plant) || heating(plant);
+  // passive cooling: the circuit is fed from the ground loop and the heat pump takes no part
+  const passive = (p) => p.cooling() && !p.activeCooling();
+  const notPassive = (p) => !passive(p);
+  // The two returns join above the supplies' branches, so the only place where the pipes meet is the tank's
+  // return passing the supply line from the heat pump (one crossing cannot be avoided with two consumers on the
+  // same side of the heat pump); the return passes under it. The circulation pump and the valve sit below.
+  const joinY = 588;
+  const branchY = 644;
   // the tank's heating water lines run down the left side of its panel to its ports: the supply to the upper
   // one on the inner lane, the return from the lower one on the outer lane
-  drawPipe(scene, { points: [[tankAt.x, tankAt.returnY], [tank.x + 12, tankAt.returnY], [tank.x + 12, 648], [340, 648]], tone: TONES.cold, active: hotWater });
-  drawPipe(scene, { points: [gate.ret, [gate.ret[0], 648], [340, 648]], tone: TONES.circuitReturn, active: heating });
-  drawPipe(scene, { points: [[340, 648], [340, 570]], tone: TONES.returnTrunk, active: returning });
-  drawPipe(scene, { points: [[260, 570], [260, 618]], tone: TONES.supplyTrunk, active: heatDelivering });
-  drawPipe(scene, { points: [[260, 618], [tank.x + 30, 618], [tank.x + 30, tankAt.supplyY], [tankAt.x, tankAt.supplyY]], tone: TONES.warm, active: hotWater });
-  drawPipe(scene, { points: [[260, 618], [gate.supply[0], 618], gate.supply], tone: TONES.circuitSupply, active: heating });
+  drawPipe(scene, {
+    points: [[tankAt.x, tankAt.returnY], [tank.x + 12, tankAt.returnY], [tank.x + 12, joinY], [340, joinY]],
+    tone: TONES.cold,
+    active: hotWater,
+    gaps: [[260, joinY, "x"]],
+  });
+  drawPipe(scene, { points: [gate.ret, [gate.ret[0], joinY], [340, joinY]], tone: TONES.circuitReturn, active: heating, visible: notPassive });
+  drawPipe(scene, { points: [[340, joinY], [340, 570]], tone: TONES.returnTrunk, active: returning });
+  drawPipe(scene, { points: [[260, 570], [260, branchY]], tone: TONES.supplyTrunk, active: heatDelivering });
+  drawPipe(scene, { points: [[260, branchY], [tank.x + 30, branchY], [tank.x + 30, tankAt.supplyY], [tankAt.x, tankAt.supplyY]], tone: TONES.warm, active: hotWater });
+  drawPipe(scene, { points: [[260, branchY], [gate.supply[0], branchY], gate.supply], tone: TONES.circuitSupply, active: heating, visible: notPassive });
 
   const gp2 = (p) => (p.num("gp2") || 0) > 0;
   drawPipe(scene, { points: [[305, 270], [305, 200]], tone: TONES.toGround, active: gp2 });
   drawPipe(scene, { points: [[350, 200], [350, 270]], tone: TONES.fromGround, active: gp2 });
   // passive cooling along the right edge: the inner line brings cold water to the circuit's supply port,
   // the outer one takes the warm water from its return port back to the ground loop
-  const passive = (p) => p.cooling() && !p.activeCooling();
   const coolingPump = (p) => p.on("cooling_pump") === true;
   drawPipe(scene, { points: [gate.ret, [gate.ret[0], 674], [462, 674], [462, 130], [430, 130]], tone: TONES.warm, visible: passive, active: coolingPump });
   drawPipe(scene, { points: [[430, 160], [444, 160], [444, 662], [gate.supply[0], 662], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
@@ -1591,11 +1714,11 @@ function buildNarrow(scene, cfg) {
   drawTank(scene, tank, { ...cfg.tank, compact: true });
   drawCircuit(scene, circuit, cfg.circuit, gate);
 
-  drawValve(scene, 260, 618);
+  drawValve(scene, 260, branchY);
   drawPump(scene, 350, 235, (p) => (p.num("gp2") || 0) > 0, {
     slot: "gp2", label: "GP2", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp2")),
   });
-  drawPump(scene, 260, 592, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
+  drawPump(scene, 260, 614, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
     slot: "gp1", label: "GP1", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp1")),
   });
 }
@@ -1735,6 +1858,7 @@ class NibePlantCard extends HTMLElement {
     const layout = LAYOUTS[this._layout];
     const scene = new Scene(this, this._plant, layout.width, layout.height);
     scene.animation = this._config.animation;
+    scene.svg.classList.toggle("npc-animated", scene.animation !== false);
     layout.build(scene, this._config);
     card.appendChild(scene.svg);
     this._note = document.createElement("div");
