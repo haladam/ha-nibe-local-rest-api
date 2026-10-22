@@ -389,7 +389,7 @@ with sync_playwright() as p:
                   trunk_r=((645, 340), (630, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 457), (645, 340)),
                   to_ground=((360, 365), (220, 365)), from_ground=((220, 410), (360, 410)),
                   cool_s=((220, 497), (700, 412)), cool_r=((700, 457), (220, 520))),
-        380: dict(trunk_s=((260, 570), (260, 644)), tank_s=((260, 644), (66, 760)), circ_s=((260, 644), (290, 684)),
+        380: dict(trunk_s=((260, 570), (260, 648)), tank_s=((260, 648), (66, 760)), circ_s=((260, 648), (290, 684)),
                   trunk_r=((340, 588), (340, 570)), tank_r=((66, 868), (340, 588)), circ_r=((380, 684), (340, 588)),
                   to_ground=((305, 270), (305, 200)), from_ground=((350, 200), (350, 270)),
                   cool_s=((430, 160), (290, 684)), cool_r=((380, 684), (430, 130))),
@@ -477,7 +477,7 @@ with sync_playwright() as p:
         for (let l = 0; l <= n; l += 2) min = Math.min(min, p.getPointAtLength(l).x);
         return {a: [Math.round(a.x), Math.round(a.y)], minX: Math.round(min)}; })"""
     pg = Page(browser, "hotwater", width=380); lanes = pg.page.evaluate(LANES); pg.close()
-    ret = [p for p in lanes if p["a"] == [66, 868]]; sup = [p for p in lanes if p["a"] == [260, 644] and p["minX"] < 100]
+    ret = [p for p in lanes if p["a"] == [66, 868]]; sup = [p for p in lanes if p["a"] == [260, 648] and p["minX"] < 100]
     check("phone layout: the tank's return runs on the outer lane and the supply on the inner one, 12 px or more apart (so they do not cross there)",
           len(ret) == 1 and len(sup) == 1 and ret[0]["minX"] + 12 <= sup[0]["minX"], (ret, sup))
 
@@ -572,6 +572,30 @@ with sync_playwright() as p:
     check("animation: false stops the compressor and the pump impellers as well as the moving pipes", sca["name"] == "none" and sca["impeller"] == "none" and sc["impeller"] != "none", (sca["name"], sca["impeller"], sc["impeller"]))
     pg = Page(browser, "heating"); pg.page.emulate_media(reduced_motion="reduce"); name = pg.page.evaluate("() => getComputedStyle(window.__card.shadowRoot.querySelector('.npc-orbit')).animationName"); pg.close()
     check("prefers-reduced-motion stops the compressor", name == "none", name)
+    # ---- circulation pumps: in-line circulators with flanges and a seven-bladed, backward-curved impeller
+    PUMP = r"""() => { const root = window.__card.shadowRoot;
+      return [...root.querySelectorAll('.npc-pump')].map(p => {
+        const blades = [...p.querySelectorAll('.npc-blade')], imp = p.querySelector('.npc-impeller'), cs = getComputedStyle(imp);
+        const pts = (b) => [...b.getAttribute('d').matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map(m => [+m[1], +m[2]]);
+        const ang = (q) => Math.atan2(q[1], q[0]) * 180 / Math.PI;
+        const turn = blades.map(b => { const q = pts(b); let d = ang(q[q.length - 1]) - ang(q[0]); while (d > 180) d -= 360; while (d < -180) d += 360; return d; });
+        const fl = [...p.querySelectorAll('.npc-flange')].map(f => { const b = f.getBoundingClientRect(); return [b.width, b.height]; });
+        const body = p.querySelector('.npc-pump-body').getBoundingClientRect();
+        const pipe = p.querySelector('.npc-pump-body').parentNode.getAttribute('transform');
+        return {name: p.querySelector('title').textContent, blades: blades.length, turn, flanges: fl.length, vertical: pipe.includes('rotate(90)'),
+                flangeAlong: fl.length ? Math.abs(fl[0][0] - fl[0][1]) > 1 : false, anim: cs.animationName, state: cs.animationPlayState,
+                bodyW: body.width, x: body.x, y: body.y}; }); }"""
+    for width, vertical in ((900, False), (380, True)):
+        lay = "wide" if width == 900 else "phone"
+        pg = Page(browser, "heating", width=width); pumps = pg.page.evaluate(PUMP); pg.close()
+        check(f"{lay} layout: GP1 and GP2 are circulators with two flanges and seven blades each", sorted(p["name"] for p in pumps) == ["GP1", "GP2"] and all(p["blades"] == 7 and p["flanges"] == 2 for p in pumps), pumps)
+        check(f"{lay} layout: the blades curve backwards, against the clockwise sense of rotation", all(all(t < -30 for t in p["turn"]) for p in pumps), [p["turn"] for p in pumps])
+        check(f"{lay} layout: the flanges sit on the pipe ({'vertical' if vertical else 'horizontal'}), so the pump is turned to match", all(p["vertical"] == vertical for p in pumps), [(p["name"], p["vertical"]) for p in pumps])
+        check(f"{lay} layout: running pumps turn their impeller", all(p["anim"] == "npc-spin" and p["state"] == "running" for p in pumps), [(p["name"], p["anim"], p["state"]) for p in pumps])
+    pg = Page(browser, "idle"); pumps = pg.page.evaluate(PUMP); pg.close()
+    check("stopped pumps stand still", all(p["state"] == "paused" for p in pumps), [(p["name"], p["state"]) for p in pumps])
+    pg = Page(browser, "hotwater", config={"type": "custom:nibe-plant-card", "tank": {"circulation": True}}); pumps = pg.page.evaluate(PUMP); pg.close()
+    check("the hot water circulation pump (opt-in) is drawn the same way, on its vertical pipe", any(p["name"] == "Circulation" and p["vertical"] and p["blades"] == 7 for p in pumps), pumps)
     pg = Page(browser, "heating"); pg.page.evaluate("window.__moreInfo.length = 0")
     pg.page.evaluate("() => window.__card.shadowRoot.querySelector('.npc-compressor').dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}))")
     check("compressor: clicking it opens the frequency entity", pg.page.evaluate("window.__moreInfo") == [by_point(pg.states, 1799)], pg.page.evaluate("window.__moreInfo")); pg.close()

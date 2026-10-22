@@ -203,21 +203,53 @@ function spinner(cx, cy, radius, children, className) {
   return { outer: svgEl("g", { transform: `translate(${cx} ${cy})` }, [inner]), inner };
 }
 
-/** Circulation pump: housing plus a spinning impeller, with an optional caption. */
+/**
+ * Circulation pump, drawn like the in-line wet rotor circulators of a heat pump (the S1155 has two of the UPM
+ * type): the casing with a flange at each pipe connection, and the impeller as if the motor were cut away,
+ * a closed centrifugal impeller with seven backward-curved blades inside its shroud. Backward-curved: going
+ * outwards, each blade trails behind the sense of rotation (clockwise).
+ * `orient` is "v" when the pipe the pump sits on runs vertically (the default is horizontal).
+ */
+const PUMP_BLADES = 7;
+const PUMP_SWEEP = 55; // degrees a blade bends back between hub and rim
+
+function pumpBlade(index, from, to) {
+  let d = "";
+  for (let k = 0; k <= 8; k++) {
+    const f = k / 8;
+    const r = from + (to - from) * f;
+    const a = ((index * 360) / PUMP_BLADES - PUMP_SWEEP * f) * (Math.PI / 180);
+    d += `${k ? " L" : "M"} ${(r * Math.cos(a)).toFixed(2)} ${(r * Math.sin(a)).toFixed(2)}`;
+  }
+  return svgEl("path", { class: "npc-blade", d });
+}
+
 function drawPump(scene, cx, cy, running, options) {
   const opts = options || {};
   const radius = opts.radius || 14;
   const wrap = svgEl("g", { class: "npc-pump" });
-  wrap.appendChild(svgEl("circle", { cx, cy, r: radius, class: "npc-pump-body" }));
-  const vanes = [0, 1, 2].map((i) =>
-    svgEl("path", {
-      class: "npc-vane",
-      transform: `rotate(${i * 120})`,
-      d: `M 0 0 Q ${radius * 0.55} -${radius * 0.2} ${radius * 0.72} -${radius * 0.6} Q ${radius * 0.25} -${radius * 0.5} 0 0 Z`,
-    })
+  const flange = (side) =>
+    svgEl("rect", {
+      class: "npc-flange",
+      x: side < 0 ? -radius - radius * 0.25 : radius - radius * 0.04,
+      y: -radius * 0.68,
+      width: radius * 0.29,
+      height: radius * 1.36,
+      rx: 1.5,
+    });
+  const blades = Array.from({ length: PUMP_BLADES }, (_, i) => pumpBlade(i, radius * 0.24, radius * 0.67));
+  const hub = svgEl("circle", { r: radius * 0.2, class: "npc-hub" });
+  const spin = spinner(0, 0, radius - 3, [...blades, hub], "npc-impeller");
+  wrap.appendChild(
+    svgEl("g", { transform: `translate(${cx} ${cy})${opts.orient === "v" ? " rotate(90)" : ""}` }, [
+      flange(-1),
+      flange(1),
+      svgEl("circle", { r: radius, class: "npc-pump-body" }),
+      svgEl("circle", { r: radius * 0.77, class: "npc-shroud" }),
+      spin.outer,
+      svgEl("circle", { r: radius * 0.07, class: "npc-shaft" }),
+    ])
   );
-  const spin = spinner(cx, cy, radius - 3, vanes, "npc-impeller");
-  wrap.appendChild(spin.outer);
   const title = svgEl("title");
   title.textContent = opts.label || "";
   wrap.appendChild(title);

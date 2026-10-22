@@ -4,6 +4,14 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.14 - 2026-10-22
+
+* Card: the circulation pumps look like the real thing. The three-bladed fan is replaced by an in-line
+  circulator: casing with a flange at each pipe connection and, as if the motor were cut away, a
+  closed impeller with seven backward-curved blades that turns while the pump runs. The pumps are turned
+  to match their pipe (vertical on the phone layout and for the hot water circulation pump).
+  On the phone the branch point and its valve moved down a little to make room.
+
 ## 0.9.13 - 2026-10-22
 
 * Card: below the tank, the readout of the top temperature (BT7) is replaced by the hot water start

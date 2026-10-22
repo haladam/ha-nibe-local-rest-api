@@ -96,7 +96,7 @@ function buildWide(scene, cfg) {
   drawPump(scene, 258, 410, (p) => (p.num("gp2") || 0) > 0, {
     slot: "gp2", label: "GP2", caption: (p, h) => percentText(h, p.num("gp2")),
   });
-  drawPump(scene, 656, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
+  drawPump(scene, 653, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
     slot: "gp1", label: "GP1", caption: (p, h) => percentText(h, p.num("gp1")),
   });
   if (cfg.cooling_label !== false) {
@@ -132,7 +132,7 @@ function buildNarrow(scene, cfg) {
   // return passing the supply line from the heat pump (one crossing cannot be avoided with two consumers on the
   // same side of the heat pump); the return passes under it. The circulation pump and the valve sit below.
   const joinY = 588;
-  const branchY = 644;
+  const branchY = 648;
   // the tank's heating water lines run down the left side of its panel to its ports: the supply to the upper
   // one on the inner lane, the return from the lower one on the outer lane
   drawPipe(scene, {
@@ -171,10 +171,10 @@ function buildNarrow(scene, cfg) {
 
   drawValve(scene, 260, branchY);
   drawPump(scene, 350, 235, (p) => (p.num("gp2") || 0) > 0, {
-    slot: "gp2", label: "GP2", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp2")),
+    slot: "gp2", label: "GP2", orient: "v", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp2")),
   });
   drawPump(scene, 260, 614, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
-    slot: "gp1", label: "GP1", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp1")),
+    slot: "gp1", label: "GP1", orient: "v", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp1")),
   });
 }
 

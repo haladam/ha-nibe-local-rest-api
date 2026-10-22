@@ -719,21 +719,53 @@ function spinner(cx, cy, radius, children, className) {
   return { outer: svgEl("g", { transform: `translate(${cx} ${cy})` }, [inner]), inner };
 }
 
-/** Circulation pump: housing plus a spinning impeller, with an optional caption. */
+/**
+ * Circulation pump, drawn like the in-line wet rotor circulators of a heat pump (the S1155 has two of the UPM
+ * type): the casing with a flange at each pipe connection, and the impeller as if the motor were cut away,
+ * a closed centrifugal impeller with seven backward-curved blades inside its shroud. Backward-curved: going
+ * outwards, each blade trails behind the sense of rotation (clockwise).
+ * `orient` is "v" when the pipe the pump sits on runs vertically (the default is horizontal).
+ */
+const PUMP_BLADES = 7;
+const PUMP_SWEEP = 55; // degrees a blade bends back between hub and rim
+
+function pumpBlade(index, from, to) {
+  let d = "";
+  for (let k = 0; k <= 8; k++) {
+    const f = k / 8;
+    const r = from + (to - from) * f;
+    const a = ((index * 360) / PUMP_BLADES - PUMP_SWEEP * f) * (Math.PI / 180);
+    d += `${k ? " L" : "M"} ${(r * Math.cos(a)).toFixed(2)} ${(r * Math.sin(a)).toFixed(2)}`;
+  }
+  return svgEl("path", { class: "npc-blade", d });
+}
+
 function drawPump(scene, cx, cy, running, options) {
   const opts = options || {};
   const radius = opts.radius || 14;
   const wrap = svgEl("g", { class: "npc-pump" });
-  wrap.appendChild(svgEl("circle", { cx, cy, r: radius, class: "npc-pump-body" }));
-  const vanes = [0, 1, 2].map((i) =>
-    svgEl("path", {
-      class: "npc-vane",
-      transform: `rotate(${i * 120})`,
-      d: `M 0 0 Q ${radius * 0.55} -${radius * 0.2} ${radius * 0.72} -${radius * 0.6} Q ${radius * 0.25} -${radius * 0.5} 0 0 Z`,
-    })
+  const flange = (side) =>
+    svgEl("rect", {
+      class: "npc-flange",
+      x: side < 0 ? -radius - radius * 0.25 : radius - radius * 0.04,
+      y: -radius * 0.68,
+      width: radius * 0.29,
+      height: radius * 1.36,
+      rx: 1.5,
+    });
+  const blades = Array.from({ length: PUMP_BLADES }, (_, i) => pumpBlade(i, radius * 0.24, radius * 0.67));
+  const hub = svgEl("circle", { r: radius * 0.2, class: "npc-hub" });
+  const spin = spinner(0, 0, radius - 3, [...blades, hub], "npc-impeller");
+  wrap.appendChild(
+    svgEl("g", { transform: `translate(${cx} ${cy})${opts.orient === "v" ? " rotate(90)" : ""}` }, [
+      flange(-1),
+      flange(1),
+      svgEl("circle", { r: radius, class: "npc-pump-body" }),
+      svgEl("circle", { r: radius * 0.77, class: "npc-shroud" }),
+      spin.outer,
+      svgEl("circle", { r: radius * 0.07, class: "npc-shaft" }),
+    ])
   );
-  const spin = spinner(cx, cy, radius - 3, vanes, "npc-impeller");
-  wrap.appendChild(spin.outer);
   const title = svgEl("title");
   title.textContent = opts.label || "";
   wrap.appendChild(title);
@@ -1182,7 +1214,7 @@ function drawTank(scene, box, cfg) {
       active: (plant) => plant.on("circ_pump") === true,
       radius: 12,
     });
-    drawPump(scene, xr, (hotY + coldY) / 2, (plant) => plant.on("circ_pump") === true, { slot: "circ_pump", label: t.circ, radius: 12 });
+    drawPump(scene, xr, (hotY + coldY) / 2, (plant) => plant.on("circ_pump") === true, { slot: "circ_pump", label: t.circ, radius: 12, orient: "v" });
     group.appendChild(svgText(box.x + box.w - 12, hotY - 12, t.tank, { class: "npc-caption", "text-anchor": "end" }));
   }
 
@@ -1543,8 +1575,14 @@ ${ORBIT_KEYFRAMES}
 
 /* pump & valve ---------------------------------------------------------- */
 .npc-pump-body { fill: var(--npc-surface); stroke: var(--npc-stroke); stroke-width: 1.5; transition: stroke 0.5s ease; }
-.npc-vane { fill: var(--npc-muted); transition: fill 0.5s ease; }
-.npc-pump.npc-running .npc-vane { fill: var(--info-color, #39b0e5); }
+.npc-shroud { fill: rgba(127, 127, 127, 0.12); stroke: var(--npc-muted); stroke-width: 0.8; transition: fill 0.5s ease, stroke 0.5s ease; }
+.npc-blade { fill: none; stroke: var(--npc-muted); stroke-width: 1.7; stroke-linecap: round; transition: stroke 0.5s ease; }
+.npc-hub { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-shaft { fill: var(--npc-surface); }
+.npc-flange { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-pump.npc-running .npc-blade { stroke: var(--info-color, #39b0e5); }
+.npc-pump.npc-running .npc-hub, .npc-pump.npc-running .npc-flange { fill: var(--info-color, #39b0e5); }
+.npc-pump.npc-running .npc-shroud { fill: rgba(57, 176, 229, 0.14); stroke: var(--info-color, #39b0e5); }
 .npc-pump.npc-running .npc-pump-body { stroke: var(--info-color, #39b0e5); }
 .npc-valve-body { fill: var(--npc-muted); transition: fill 0.5s ease; }
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }
@@ -1652,7 +1690,7 @@ function buildWide(scene, cfg) {
   drawPump(scene, 258, 410, (p) => (p.num("gp2") || 0) > 0, {
     slot: "gp2", label: "GP2", caption: (p, h) => percentText(h, p.num("gp2")),
   });
-  drawPump(scene, 656, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
+  drawPump(scene, 653, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
     slot: "gp1", label: "GP1", caption: (p, h) => percentText(h, p.num("gp1")),
   });
   if (cfg.cooling_label !== false) {
@@ -1688,7 +1726,7 @@ function buildNarrow(scene, cfg) {
   // return passing the supply line from the heat pump (one crossing cannot be avoided with two consumers on the
   // same side of the heat pump); the return passes under it. The circulation pump and the valve sit below.
   const joinY = 588;
-  const branchY = 644;
+  const branchY = 648;
   // the tank's heating water lines run down the left side of its panel to its ports: the supply to the upper
   // one on the inner lane, the return from the lower one on the outer lane
   drawPipe(scene, {
@@ -1727,10 +1765,10 @@ function buildNarrow(scene, cfg) {
 
   drawValve(scene, 260, branchY);
   drawPump(scene, 350, 235, (p) => (p.num("gp2") || 0) > 0, {
-    slot: "gp2", label: "GP2", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp2")),
+    slot: "gp2", label: "GP2", orient: "v", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp2")),
   });
   drawPump(scene, 260, 614, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
-    slot: "gp1", label: "GP1", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp1")),
+    slot: "gp1", label: "GP1", orient: "v", captionAt: "right", caption: (p, h) => percentText(h, p.num("gp1")),
   });
 }
 

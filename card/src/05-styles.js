@@ -160,8 +160,14 @@ ${ORBIT_KEYFRAMES}
 
 /* pump & valve ---------------------------------------------------------- */
 .npc-pump-body { fill: var(--npc-surface); stroke: var(--npc-stroke); stroke-width: 1.5; transition: stroke 0.5s ease; }
-.npc-vane { fill: var(--npc-muted); transition: fill 0.5s ease; }
-.npc-pump.npc-running .npc-vane { fill: var(--info-color, #39b0e5); }
+.npc-shroud { fill: rgba(127, 127, 127, 0.12); stroke: var(--npc-muted); stroke-width: 0.8; transition: fill 0.5s ease, stroke 0.5s ease; }
+.npc-blade { fill: none; stroke: var(--npc-muted); stroke-width: 1.7; stroke-linecap: round; transition: stroke 0.5s ease; }
+.npc-hub { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-shaft { fill: var(--npc-surface); }
+.npc-flange { fill: var(--npc-muted); transition: fill 0.5s ease; }
+.npc-pump.npc-running .npc-blade { stroke: var(--info-color, #39b0e5); }
+.npc-pump.npc-running .npc-hub, .npc-pump.npc-running .npc-flange { fill: var(--info-color, #39b0e5); }
+.npc-pump.npc-running .npc-shroud { fill: rgba(57, 176, 229, 0.14); stroke: var(--info-color, #39b0e5); }
 .npc-pump.npc-running .npc-pump-body { stroke: var(--info-color, #39b0e5); }
 .npc-valve-body { fill: var(--npc-muted); transition: fill 0.5s ease; }
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }

@@ -77,6 +77,11 @@ Notes
   keeps it to that one place and draws it as a bridge (the return passes under the supply, with a
   gap in it). In passive cooling the circuit is fed from the ground loop alone, so the heating
   pipes to it are not drawn then.
+* The circulation pumps (GP1 heating medium, GP2 brine) are drawn as in-line circulators with a flange
+  at each pipe connection and, as if the motor were cut away, a closed impeller with seven
+  backward-curved blades. The impeller turns while the pump runs. GP2 sits on the line that brings the
+  brine back from the ground loop into the heat pump ("brine in", before the evaporator), which is where
+  NIBE's service manual puts it (the brine in sensor BT10 is "before" it).
 * The compressor is drawn as a scroll compressor: a fixed spiral wall and an identical one that
   orbits around it without turning. Where the walls touch they close off pockets of gas that
   move towards the middle and shrink, which is how the gas is compressed (blue at the rim,

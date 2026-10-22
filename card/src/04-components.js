@@ -400,7 +400,7 @@ function drawTank(scene, box, cfg) {
       active: (plant) => plant.on("circ_pump") === true,
       radius: 12,
     });
-    drawPump(scene, xr, (hotY + coldY) / 2, (plant) => plant.on("circ_pump") === true, { slot: "circ_pump", label: t.circ, radius: 12 });
+    drawPump(scene, xr, (hotY + coldY) / 2, (plant) => plant.on("circ_pump") === true, { slot: "circ_pump", label: t.circ, radius: 12, orient: "v" });
     group.appendChild(svgText(box.x + box.w - 12, hotY - 12, t.tank, { class: "npc-caption", "text-anchor": "end" }));
   }
 
