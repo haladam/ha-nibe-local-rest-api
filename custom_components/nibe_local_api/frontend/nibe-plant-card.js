@@ -36,7 +36,7 @@
 (() => {
 "use strict";
 
-const CARD_VERSION = "0.9.10";
+const CARD_VERSION = "0.9.11";
 const CARD_TAG = "nibe-plant-card";
 
 if (customElements.get(CARD_TAG)) {
@@ -1320,6 +1320,12 @@ ha-card.npc-has-title { padding-top: 4px; }
   --npc-surface: var(--card-background-color, #fff);
   --npc-panel-bg: rgba(127, 127, 127, 0.10);
 }
+/* wide layout: never taller than the window (room is left for the header and the margins around the card);
+   the picture keeps its proportions and is centred. The floor keeps it readable in a very short window. */
+ha-card.npc-fit .npc-svg {
+  max-height: max(380px, calc(100vh - 160px));
+  max-height: max(380px, calc(100dvh - 160px));
+}
 
 /* panels ---------------------------------------------------------------- */
 .npc-panel { fill: var(--npc-panel-bg); stroke: var(--npc-stroke); stroke-width: 1; }
@@ -1612,6 +1618,7 @@ function normalizeConfig(raw) {
     ...config,
     layout: config.layout === "wide" || config.layout === "narrow" ? config.layout : "auto",
     animation: config.animation !== false,
+    fit_height: config.fit_height !== false,
     entities: config.entities && typeof config.entities === "object" ? config.entities : {},
     pv: config.pv && typeof config.pv === "object" ? config.pv : {},
     heatpump: { name: "NIBE S1155", ...(config.heatpump || {}) },
@@ -1723,6 +1730,8 @@ class NibePlantCard extends HTMLElement {
       card.appendChild(header);
     }
     this._layout = this._pickLayout();
+    // the wide picture is scaled to the window height as well, so it fits on one screen without scrolling
+    if (this._layout === "wide" && this._config.fit_height) card.classList.add("npc-fit");
     const layout = LAYOUTS[this._layout];
     const scene = new Scene(this, this._plant, layout.width, layout.height);
     scene.animation = this._config.animation;
