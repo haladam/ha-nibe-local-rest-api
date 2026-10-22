@@ -104,6 +104,8 @@ scripts/                            run_tests.sh, sync_card.sh, release.sh
    commits and tags `vx.y.z`.
 3. `git push && git push --tags`. The *Release* workflow checks that the tag matches the
    manifest, builds the zip and publishes the GitHub release; HACS offers it as an update.
+   (Creating the release by hand under *Releases → Draft a new release* for a new tag works as
+   well; the workflow then adds the zip and the notes.)
 
 CI (`.github/workflows`) runs hassfest and the HACS validation, all tests, and the release.
 The HACS validation needs the repository to be public and to have a description and topics.

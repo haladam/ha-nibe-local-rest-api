@@ -1,6 +1,7 @@
 name: Release
 
-# Push a tag such as v0.9.11 (scripts/release.sh does this) and a GitHub release is created.
+# Push a tag such as v0.9.11 (scripts/release.sh prepares it) and a GitHub release is created.
+# A release created by hand in the web interface for a new tag works too: the zip and the notes are added.
 # HACS offers the newest release as the update; the zip is for manual installs.
 on:
   push:
@@ -47,9 +48,14 @@ jobs:
           cd custom_components/nibe_local_api
           zip -r -q "$GITHUB_WORKSPACE/nibe_local_api.zip" . -x '*/__pycache__/*' '__pycache__/*'
 
-      - name: Create the release
+      - name: Create the release (or complete one made by hand in the web interface)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" nibe_local_api.zip \
-            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" nibe_local_api.zip --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" nibe_local_api.zip \
+              --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+          fi
