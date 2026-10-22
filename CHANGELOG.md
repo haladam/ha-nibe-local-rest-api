@@ -4,6 +4,19 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.16 - 2026-10-22
+
+* Undoes the 0.9.15 change to "More hot water, minutes remaining" (point 4030): the pump's REST interface
+  refuses writes to it with HTTP 400, so it is a read-only sensor again. If you updated to 0.9.15, the
+  number entity of that point is left behind as "no longer provided" and can be deleted; the sensor comes
+  back (or is created) and the card keeps finding it by itself.
+* "More hot water" (point 4564) is the way to start a one-time hot water increase over REST. Tested on an
+  S1155: writing 2 made the pump set the minutes remaining to 120 within seconds and count them down. The
+  entity is still created disabled; its description now says what to write. The pump's own length (120
+  minutes) cannot be changed over REST.
+* The README example (hot water boost before the solar peak) now writes 2 into More hot water, checks that
+  the pump started, and cancels after 2 hours 15 minutes if it is still on.
+
 ## 0.9.15 - 2026-10-22
 
 * "More hot water (minutes)" (point 4030) is now a number you can write, enabled by default. Writing

@@ -79,14 +79,15 @@ Xerolux (MIT); see [`THIRD_PARTY_NOTICES.md`](custom_components/nibe_local_api/T
 
 ## Example: hot water boost before the solar peak
 
-Writing a number of minutes into **More hot water (minutes)** starts a one-time hot water increase:
-the pump sets *More hot water* to 2 and counts the minutes down to 0 by itself, so there is nothing to
-switch back. (The pump's REST interface flags this point read-only; the NIBE Modbus integration writes it
-fine. If your pump refuses the write here, the entity reports the error and you can use the Modbus
-integration for this one entity.) The card shows the remaining minutes as "Boost" while it runs.
+Writing **2** into **More hot water** starts the pump's one-time hot water increase. The pump then sets
+*More hot water, minutes remaining* to 120 and counts it down by itself (the card shows it as "Boost"
+while it runs). *More hot water* is created disabled, so enable it first (Settings, Devices, the
+integration's entities). It is the only one of the two you can write over REST: the pump answers a write to
+*minutes remaining* with "bad request", so the length of the boost is the pump's own 120 minutes.
 
-This automation starts a 2 hour boost 45 minutes before the Solcast peak, once a day, on days with a
-worthwhile forecast and a tank that is not already hot. Adjust the entity ids to yours:
+This automation starts the increase 45 minutes before the Solcast peak, once a day, on days with a
+worthwhile forecast and a tank that is not already hot. It checks that the pump took it and cancels it
+after 2 hours 15 minutes if it is still on. Adjust the entity ids to yours:
 
 ```yaml
 alias: Hot water boost before solar peak
@@ -105,17 +106,41 @@ conditions:
     entity_id: sensor.solcast_forecast_today
     above: 8
   - condition: numeric_state   # tank not already hot
-    entity_id: sensor.nibe_hot_water_top_bt7
+    entity_id: sensor.nibe_s1155_hot_water_top_bt7
     below: 52
-  - condition: numeric_state   # no boost running
-    entity_id: number.nibe_more_hot_water_minutes
-    below: 1
+  - condition: state           # no increase running
+    entity_id: sensor.nibe_s1155_more_hot_water_status
+    state: "0"
 actions:
   - action: number.set_value
     target:
-      entity_id: number.nibe_more_hot_water_minutes
+      entity_id: number.nibe_s1155_more_hot_water
     data:
-      value: 120
+      value: 2
+  - wait_template: "{{ is_state('sensor.nibe_s1155_more_hot_water_status', '1') }}"
+    timeout: "00:02:00"        # the status sensor followed within half a minute in a test
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ not wait.completed }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: Hot water boost did not start
+          message: The pump did not report a running increase two minutes after More hot water was set to 2.
+      - stop: "The pump did not start the hot water increase"
+  - wait_template: "{{ is_state('sensor.nibe_s1155_more_hot_water_status', '0') }}"
+    timeout: "02:15:00"        # the pump ends it itself; this only makes sure it cannot stay on
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ not wait.completed }}"
+    then:
+      - action: number.set_value
+        target:
+          entity_id: number.nibe_s1155_more_hot_water
+        data:
+          value: 0
 ```
 
 The pump finishes its current heating period (menu 7.1.10.1, 30 minutes by default) before it switches to
