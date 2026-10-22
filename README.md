@@ -112,5 +112,5 @@ The HACS validation needs the repository to be public and to have a description 
 
 ## Licence
 
-No licence has been chosen yet. The card contains code adapted from heatpump-flow-card
-(MIT, see the notice above).
+[MIT](LICENSE). The card contains code adapted from heatpump-flow-card by Xerolux, also MIT;
+its notice is in [`THIRD_PARTY_NOTICES.md`](custom_components/nibe_local_api/THIRD_PARTY_NOTICES.md).

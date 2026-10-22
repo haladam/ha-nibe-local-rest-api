@@ -9,7 +9,7 @@ release is known to have changed.
 * Card: the bottom hot water sensor (BT6) is drawn where it really sits, in the outer
   (heating water) layer of the tank, further down. The colour of the hot water vessel follows
   BT7 only.
-* The repository is set up: HACS metadata, CI, release workflow. No change to the integration itself apart
+* The repository is set up: MIT licence, HACS metadata, CI, release workflow. No change to the integration itself apart
   from the manifest links (`documentation`, `issue_tracker`, `codeowners`).
 
 ## 0.9.9 - 2026-10-22
