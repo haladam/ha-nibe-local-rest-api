@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile
+        run: python -m compileall -q custom_components
+      - name: Run the suites
+        run: |
+          status=0
+          for t in tests/test_*.py; do
+            echo "::group::$t"
+            python -I -B "$t" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+  card:
+    name: Card build and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build the card
+        run: ./card/build.sh
+      - name: The bundled card is the one built from card/src
+        run: cmp card/nibe-plant-card.js custom_components/nibe_local_api/frontend/nibe-plant-card.js
+      - name: Install Playwright
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+      - name: Card behaviour tests
+        run: python -I -B card/test/test_card.py
+      - name: Card layout check (no overlapping text or pipes)
+        run: python -I -B card/test/overlaps.py

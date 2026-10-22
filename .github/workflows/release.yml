@@ -1,0 +1,55 @@
+name: Release
+
+# Push a tag such as v0.9.11 (scripts/release.sh does this) and a GitHub release is created.
+# HACS offers the newest release as the update; the zip is for manual installs.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag matches the manifest version
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("custom_components/nibe_local_api/manifest.json"))["version"])')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match manifest version $version"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: The bundled card is the one built from card/src
+        run: |
+          ./card/build.sh
+          cmp card/nibe-plant-card.js custom_components/nibe_local_api/frontend/nibe-plant-card.js
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; if ($2 == v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "::error::no section '## $VERSION' in CHANGELOG.md"; exit 1; fi
+          cat notes.md
+
+      - name: Zip the integration
+        run: |
+          cd custom_components/nibe_local_api
+          zip -r -q "$GITHUB_WORKSPACE/nibe_local_api.zip" . -x '*/__pycache__/*' '__pycache__/*'
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" nibe_local_api.zip \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
