@@ -1,0 +1,35 @@
+set_aux:
+  name: Set AUX function
+  description: >-
+    Activate or deactivate a NIBE "AUX via Modbus" function, for example blocking
+    additional heat. Requires software 2.4.3 or later. A blocking function stays
+    active until you turn it off again.
+    The function IDs come from NIBE's Modbus manual and have not been confirmed on a
+    real unit: check each one against NIBE's manual and try a harmless function first.
+  fields:
+    function:
+      name: Function
+      required: true
+      selector:
+        select:
+          options:
+            - hot_water_large
+            - external_adjustment
+            - block_additional_heat
+            - block_compressor
+            - block_heating
+            - block_cooling
+            - tariff_blocking
+            - sg_ready_a
+            - sg_ready_b
+            - block_external_additional_heat
+            - block_hot_water
+            - hot_water_small
+            - activate_heating
+            - activate_cooling
+    state:
+      name: State
+      required: true
+      default: true
+      selector:
+        boolean:

@@ -1,0 +1,9 @@
+# generated card bundle: built by card/build.sh, the copy HACS ships lives in custom_components/.../frontend/
+card/nibe-plant-card.js
+# screenshots written by card/test/render.py
+card/test/out/
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+/dist/

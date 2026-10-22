@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "NIBE Local REST API",
+        "data": {
+          "host": "IP address",
+          "port": "Port",
+          "https": "Use HTTPS",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "{name} rejected the saved login. Enter the username and password set in menu 7.5.15.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change connection settings",
+        "data": {
+          "host": "IP address",
+          "port": "Port",
+          "https": "Use HTTPS",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect. Check IP, port (8443 for HTTPS) and that the API is enabled in menu 7.5.15.",
+      "invalid_auth": "Invalid username or password.",
+      "unknown": "Unexpected error. Check the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "This heat pump is already configured.",
+      "reauth_successful": "Signed in again.",
+      "reconfigure_successful": "Connection settings updated.",
+      "wrong_device": "That address belongs to a different heat pump than the one configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "NIBE Local REST API options",
+        "description": "The whole points table (about 1 MB) is read at the update interval. Points chosen under fast polling are additionally re-read on their own, one small request each, which is useful for values that move quickly, for example compressor frequency, additional heat steps or power.",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "fast_points": "Fast-polled points (at most 10)",
+          "fast_interval": "Fast polling interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "How often the full points table is read.",
+          "fast_points": "Leave empty to switch fast polling off. Only points that have an enabled entity are listed.",
+          "fast_interval": "Each round sends one request per chosen point. Keep it at 5 seconds or more; the heat pump's API is slow."
+        }
+      }
+    },
+    "error": {
+      "too_many_points": "Choose at most 10 points."
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Writing point {point_id} failed: {error}"
+    },
+    "write_rejected": {
+      "message": "The heat pump rejected the write to point {point_id}: {status}"
+    },
+    "aux_unavailable": {
+      "message": "Point {point_id} reports Modbus register {found}, expected {expected}. AUX control is not available on this unit."
+    },
+    "aux_write_failed": {
+      "message": "AUX write failed: {error}"
+    },
+    "mode_failed": {
+      "message": "Setting {endpoint} to {value} failed: {error}"
+    },
+    "alarm_reset_failed": {
+      "message": "Alarm reset failed (not supported or not enabled on this unit): {error}"
+    },
+    "not_loaded": {
+      "message": "NIBE Local REST API is not loaded"
+    }
+  }
+}
