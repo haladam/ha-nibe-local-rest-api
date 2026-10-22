@@ -1,0 +1,230 @@
+
+/* =========================================================================
+ * Scene and building blocks
+ * ========================================================================= */
+
+let uid = 0;
+
+class Scene {
+  constructor(card, plant, width, height) {
+    this.card = card;
+    this.plant = plant;
+    this.width = width;
+    this.height = height;
+    this.updaters = [];
+    this.svg = svgEl("svg", {
+      class: "npc-svg",
+      viewBox: `0 0 ${width} ${height}`,
+      role: "img",
+    });
+    this.defs = svgEl("defs");
+    this.panelLayer = svgEl("g", { class: "npc-panels" });
+    this.pipeLayer = svgEl("g", { class: "npc-pipes" });
+    this.root = svgEl("g", { class: "npc-nodes" });
+    this.svg.append(this.defs, this.panelLayer, this.pipeLayer, this.root);
+  }
+
+  add(fn) {
+    this.updaters.push(fn);
+  }
+
+  update() {
+    for (const fn of this.updaters) fn(this.plant, this.plant.hass);
+  }
+
+  get t() {
+    return textsFor(this.plant.hass);
+  }
+}
+
+/** Makes an SVG node open the more-info dialog of a slot's entity. */
+function attachMoreInfo(scene, node, slotOrEntity) {
+  node.classList.add("npc-clickable");
+  node.setAttribute("tabindex", "0");
+  node.setAttribute("role", "button");
+  const open = () => {
+    const key = typeof slotOrEntity === "function" ? slotOrEntity(scene.plant) : slotOrEntity;
+    const id = scene.plant.entityId(key) || (String(key).includes(".") ? key : undefined);
+    if (id) fireEvent(scene.card, "hass-more-info", { entityId: id });
+  };
+  node.addEventListener("click", (event) => {
+    event.stopPropagation();
+    open();
+  });
+  node.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      open();
+    }
+  });
+}
+
+/** Rounded container with an optional heading. */
+function drawPanel(scene, box, title, options) {
+  const opts = options || {};
+  const group = svgEl("g", { class: `npc-node${opts.className ? ` ${opts.className}` : ""}` });
+  scene.panelLayer.appendChild(
+    svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: 16, class: "npc-panel" })
+  );
+  if (title) group.appendChild(svgText(box.x + 14, box.y + 22, title, { class: "npc-title" }));
+  scene.root.appendChild(group);
+  return group;
+}
+
+/** Small label above a value; the value is produced by `read(plant, hass)`. */
+function drawReadout(scene, group, x, y, label, read, options) {
+  const opts = options || {};
+  const anchor = opts.anchor || "start";
+  const block = svgEl("g", { class: "npc-readout" });
+  const labelNode = svgText(x, y, label, { class: "npc-label", "text-anchor": anchor });
+  const valueNode = svgText(x, y + 17, "–", {
+    class: opts.strong ? "npc-value npc-value-strong" : "npc-value",
+    "text-anchor": anchor,
+  });
+  block.append(labelNode, valueNode);
+  group.appendChild(block);
+  if (opts.slot) attachMoreInfo(scene, block, opts.slot);
+  scene.add((plant, hass) => {
+    const out = read(plant, hass);
+    const text = out && typeof out === "object" ? out.text : out;
+    valueNode.textContent = text === undefined || text === null ? "–" : text;
+    block.classList.toggle("npc-unset", !text || text === "–");
+    const color = out && typeof out === "object" ? out.color : null;
+    valueNode.style.fill = color || "";
+    if (opts.label) labelNode.textContent = opts.label(plant, hass);
+  });
+  return block;
+}
+
+/** Pill shaped value badge that sits on a pipe. */
+function drawBadge(scene, x, y, read, options) {
+  const opts = options || {};
+  const group = svgEl("g", { class: "npc-badge" });
+  const rect = svgEl("rect", { x: x - 27, y: y - 11, width: 54, height: 22, rx: 11 });
+  const text = svgText(x, y + 4, "–", { "text-anchor": "middle" });
+  group.append(rect, text);
+  scene.root.appendChild(group);
+  if (opts.slot) attachMoreInfo(scene, group, opts.slot);
+  scene.add((plant, hass) => {
+    const out = read(plant, hass);
+    const label = out && out.text ? out.text : "–";
+    text.textContent = label;
+    const width = Math.max(46, label.length * 6.6 + 16);
+    rect.setAttribute("x", String(x - width / 2));
+    rect.setAttribute("width", String(width));
+    rect.style.fill = (out && out.color) || "";
+    group.classList.toggle("npc-badge-plain", !(out && out.color));
+    group.classList.toggle("npc-unset", label === "–");
+  });
+  return group;
+}
+
+/**
+ * A pipe: coloured base line plus dashes that travel along the path while the medium
+ * moves. The path direction is the flow direction.
+ *
+ * options: points, from(plant) / to(plant) temperatures for the colour gradient,
+ * fallback colour, active(plant) -> bool, visible(plant) -> bool, energy (thin dashed)
+ */
+function drawPipe(scene, options) {
+  const d = roundedPath(options.points, options.radius);
+  const group = svgEl("g", { class: `npc-pipe-group${options.energy ? " npc-energy" : ""}` });
+  const id = `npc-grad-${++uid}`;
+  const first = options.points[0];
+  const last = options.points[options.points.length - 1];
+  const stopA = svgEl("stop", { offset: "0%" });
+  const stopB = svgEl("stop", { offset: "100%" });
+  scene.defs.appendChild(
+    svgEl("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1: first[0], y1: first[1], x2: last[0], y2: last[1] }, [stopA, stopB])
+  );
+  const base = svgEl("path", { d, class: "npc-pipe", stroke: `url(#${id})`, fill: "none" });
+  const dots = svgEl("path", { d, class: "npc-dots", fill: "none" });
+  group.append(base, dots);
+  scene.pipeLayer.appendChild(group);
+  if (options.dots !== false && scene.animation === false) dots.style.display = "none";
+
+  scene.add((plant) => {
+    // `tone` ("warm" or "cold") gives the fixed red / blue flow colours; `from` / `to` colour by temperature
+    const from = options.tone ? toneColor(options.tone(plant)) : options.from ? tempColor(options.from(plant)) : null;
+    const to = options.toneTo ? toneColor(options.toneTo(plant)) : options.to ? tempColor(options.to(plant)) : null;
+    const start = from || options.fallback || COLOR_FLOW;
+    stopA.setAttribute("stop-color", start);
+    stopB.setAttribute("stop-color", to || start);
+    const visible = options.visible ? options.visible(plant) : true;
+    group.style.display = visible ? "" : "none";
+    const running = options.active ? Boolean(options.active(plant)) : true;
+    group.classList.toggle("npc-idle", !running);
+    dots.style.display = running && scene.animation !== false ? "" : "none";
+  });
+  return group;
+}
+
+function spinner(cx, cy, radius, children, className) {
+  const inner = svgEl("g", { class: `npc-spin${className ? ` ${className}` : ""}` }, [
+    svgEl("circle", { cx: 0, cy: 0, r: radius, fill: "none", stroke: "none" }),
+    ...children,
+  ]);
+  return { outer: svgEl("g", { transform: `translate(${cx} ${cy})` }, [inner]), inner };
+}
+
+/** Circulation pump: housing plus a spinning impeller, with an optional caption. */
+function drawPump(scene, cx, cy, running, options) {
+  const opts = options || {};
+  const radius = opts.radius || 14;
+  const wrap = svgEl("g", { class: "npc-pump" });
+  wrap.appendChild(svgEl("circle", { cx, cy, r: radius, class: "npc-pump-body" }));
+  const vanes = [0, 1, 2].map((i) =>
+    svgEl("path", {
+      class: "npc-vane",
+      transform: `rotate(${i * 120})`,
+      d: `M 0 0 Q ${radius * 0.55} -${radius * 0.2} ${radius * 0.72} -${radius * 0.6} Q ${radius * 0.25} -${radius * 0.5} 0 0 Z`,
+    })
+  );
+  const spin = spinner(cx, cy, radius - 3, vanes, "npc-impeller");
+  wrap.appendChild(spin.outer);
+  const title = svgEl("title");
+  title.textContent = opts.label || "";
+  wrap.appendChild(title);
+  scene.root.appendChild(wrap);
+  let caption = null;
+  if (opts.caption) {
+    caption =
+      opts.captionAt === "right"
+        ? svgText(cx + radius + 5, cy + 4, "", { class: "npc-caption", "text-anchor": "start" })
+        : svgText(cx, cy + radius + 13, "", { class: "npc-caption", "text-anchor": "middle" });
+    scene.root.appendChild(caption);
+  }
+  if (opts.slot) attachMoreInfo(scene, wrap, opts.slot);
+  scene.add((plant, hass) => {
+    wrap.classList.toggle("npc-running", Boolean(running(plant)));
+    if (caption) caption.textContent = opts.caption(plant, hass) || "";
+  });
+  return wrap;
+}
+
+function drawStatusDot(scene, group, cx, cy, resolver) {
+  const dot = svgEl("circle", { cx, cy, r: 5, class: "npc-status" });
+  group.appendChild(dot);
+  scene.add((plant) => {
+    dot.setAttribute("class", `npc-status npc-status-${resolver(plant)}`);
+  });
+  return dot;
+}
+
+/** Small rounded label whose text and tone come from `resolve(plant, hass)`. */
+function drawChip(scene, group, box, resolve, options) {
+  const opts = options || {};
+  const chip = svgEl("g", { class: "npc-chip" });
+  const rect = svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: box.h / 2 });
+  const text = svgText(box.x + box.w / 2, box.y + box.h / 2 + 4, "", { "text-anchor": "middle" });
+  chip.append(rect, text);
+  group.appendChild(chip);
+  if (opts.slot) attachMoreInfo(scene, chip, opts.slot);
+  scene.add((plant, hass) => {
+    const info = resolve(plant, hass) || {};
+    chip.style.display = info.hidden ? "none" : "";
+    text.textContent = info.text || "";
+    chip.setAttribute("class", `npc-chip${info.mode ? ` npc-mode-${info.mode}` : ""}${opts.slot ? " npc-clickable" : ""}`);
+  });
+  return chip;
+}
