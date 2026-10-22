@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root { --primary-text-color:#212121; --secondary-text-color:#727272; --divider-color:#d0d0d0; --card-background-color:#fff;
+          --primary-color:#03a9f4; --success-color:#43a047; --error-color:#db4437; --warning-color:#ffa726; --info-color:#39b0e5; }
+  body.dark { background:#111; --primary-text-color:#e1e1e1; --secondary-text-color:#9b9b9b; --divider-color:#3a3a3a; --card-background-color:#1c1c1c; }
+  body { margin:0; padding:16px; background:#f3f3f3; font-family: Roboto, sans-serif; }
+  body.dark { background:#111; }
+  #holder { width: var(--w, 900px); }
+</style></head>
+<body><div id="holder"></div>
+<script>
+customElements.define('ha-card', class extends HTMLElement {
+  constructor(){ super(); this.attachShadow({mode:'open'}).innerHTML =
+    '<style>:host{display:block;background:var(--card-background-color,#fff);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.25);color:var(--primary-text-color)}</style><slot></slot>'; }
+});
+window.__moreInfo = [];
+document.addEventListener('hass-more-info', e => window.__moreInfo.push(e.detail.entityId));
+</script>
+<script src="../nibe-plant-card.js"></script>
+</body></html>
