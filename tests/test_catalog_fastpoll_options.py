@@ -57,6 +57,14 @@ if os.path.exists(REST):
     check("A real: 3931 (pump narrower than the list) keeps the pump range", (new(3931).min_raw, new(3931).max_raw) == (100, 300))
     check("A real: tariff prices capped at 10000", all(new(p).max_raw == 10000 for p in (5271, 5286, 5293)))
     check("A real: 4564 keeps its override", (new(4564).min_raw, new(4564).max_raw) == (0, 127))
+    b = new(4030)
+    check("boost: 4030 is a writable number in minutes (0-1440), although the pump flags it read-only",
+          (b.kind, b.unit, b.min_raw, b.max_raw) == ("number", "min", 0, 1440) and not points[4030]["metadata"]["isWritable"], (b.kind, b.unit, b.min_raw, b.max_raw))
+    check("boost: 4030 is enabled by default and not hidden among the configuration entities (the card reads it)",
+          b.enabled and b.category is None and b.name == "More hot water (minutes)", (b.enabled, b.category, b.name))
+    check("boost: 4564 stays experimental and disabled, 1942 (status) stays a sensor",
+          not new(4564).enabled and new(4564).kind == "number" and new(1942).kind == "sensor" and new(1942).enabled, (new(4564).enabled, new(1942).kind))
+    check("boost: the description says how to start one", "minutes" in b.description and "counts the minutes down" in b.description, b.description)
     check("A real: range note explains the change", new(3700).range_note == "Range limited to 5-60 °C using NIBE's register list; the pump reports 5-70 °C.", new(3700).range_note)
     check("A real: range note is part of the description", "Range limited to" in new(3700).description)
     check("A real: no note where nothing changed", new(3931).range_note == "" and "Range limited" not in new(3667).description)

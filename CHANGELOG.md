@@ -4,6 +4,17 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.15 - 2026-10-22
+
+* "More hot water (minutes)" (point 4030) is now a number you can write, enabled by default. Writing
+  minutes starts a one-time hot water increase: the pump sets "More hot water" (point 4564) to 2 and
+  counts the minutes down to 0, one per minute (as the owner does with the NIBE Modbus integration).
+  Before, it was a read-only "minutes remaining" sensor. The pump's REST interface flags the point
+  read-only, so the write is unconfirmed here: if the pump refuses it, the entity reports the error.
+  The old sensor entity of the same point is left behind as "no longer provided" and can be deleted;
+  the card finds the new one by itself. An example automation (hot water boost before the solar
+  peak) is in the README.
+
 ## 0.9.14 - 2026-10-22
 
 * Card: the circulation pumps look like the real thing. The three-bladed fan is replaced by an in-line

@@ -29,7 +29,8 @@ MULTIPLIERS = {14314: 10}
 # point_id -> (min_raw or None, max_raw or None).
 # 3702: firmware minimum is 10x too low (installer manual: 55-70 C).
 # 4564 "More hot water": the firmware reports no range (min = max = 0); s8 limits used.
-RANGE_OVERRIDES = {3702: (550, None), 4564: (0, 127)}
+# 4030 "More hot water (minutes)": no range either; one day is limit enough.
+RANGE_OVERRIDES = {3702: (550, None), 4564: (0, 127), 4030: (0, 1440)}
 
 # Internal electric heater: point 1760 counts active steps of 0.5 kW each (confirmed
 # by the owner; the Modbus manual calls register 1029 "Add. heat steps"). The maximum

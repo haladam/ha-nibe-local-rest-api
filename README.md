@@ -77,6 +77,50 @@ described in [`custom_components/nibe_local_api/frontend/README.md`](custom_comp
 The card started from [heatpump-flow-card](https://github.com/Xerolux/heatpump-flow-card) by
 Xerolux (MIT); see [`THIRD_PARTY_NOTICES.md`](custom_components/nibe_local_api/THIRD_PARTY_NOTICES.md).
 
+## Example: hot water boost before the solar peak
+
+Writing a number of minutes into **More hot water (minutes)** starts a one-time hot water increase:
+the pump sets *More hot water* to 2 and counts the minutes down to 0 by itself, so there is nothing to
+switch back. (The pump's REST interface flags this point read-only; the NIBE Modbus integration writes it
+fine. If your pump refuses the write here, the entity reports the error and you can use the Modbus
+integration for this one entity.) The card shows the remaining minutes as "Boost" while it runs.
+
+This automation starts a 2 hour boost 45 minutes before the Solcast peak, once a day, on days with a
+worthwhile forecast and a tank that is not already hot. Adjust the entity ids to yours:
+
+```yaml
+alias: Hot water boost before solar peak
+mode: single
+triggers:
+  - trigger: time
+    at:
+      entity_id: sensor.solcast_peak_time_today    # a timestamp sensor
+      offset: "-00:45:00"
+conditions:
+  - condition: template        # once a day, even if the forecast moves the peak later
+    value_template: >
+      {{ this.attributes.last_triggered is none
+         or as_local(this.attributes.last_triggered).date() != now().date() }}
+  - condition: numeric_state   # a day with a real forecast
+    entity_id: sensor.solcast_forecast_today
+    above: 8
+  - condition: numeric_state   # tank not already hot
+    entity_id: sensor.nibe_hot_water_top_bt7
+    below: 52
+  - condition: numeric_state   # no boost running
+    entity_id: number.nibe_more_hot_water_minutes
+    below: 1
+actions:
+  - action: number.set_value
+    target:
+      entity_id: number.nibe_more_hot_water_minutes
+    data:
+      value: 120
+```
+
+The pump finishes its current heating period (menu 7.1.10.1, 30 minutes by default) before it switches to
+hot water, which is why the boost is started a little ahead of the peak.
+
 ## Development
 
 ```

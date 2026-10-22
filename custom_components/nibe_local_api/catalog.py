@@ -99,7 +99,13 @@ BUTTON_IDS = {3478}
 # Never expose as writable (spot prices etc.)
 READ_ONLY_IDS = {55749, 55884} | set(range(26817, 26841))
 # Writable, but the meaning of the values is not verified: created disabled.
+# 4564 "More hot water": the pump sets it itself (to 2, one-time increase) when minutes are written to 4030.
 EXPERIMENTAL_IDS = {4564}
+# 4030 "More hot water (minutes)": the firmware flags it read-only, but it is a holding register and writing
+# minutes into it starts a one-time hot water increase: the pump sets point 4564 to 2 and counts the minutes
+# down to 0, one per minute (reported by the owner, who does this with the NIBE Modbus integration; not yet
+# confirmed over REST). It stays enabled because the card shows the remaining minutes.
+BOOST_MINUTES = 4030
 # Read-only diagnostics that are still worth having enabled out of the box.
 # 1942: "More hot water status" (menu 2.1), 1 while a temporary increase is running.
 # 2509: software version (menu 3.1.15), decoded by the sensor.
@@ -209,9 +215,9 @@ CURATED = {
     1965: ("Compressor operating state", ""),
     3375: ("Alarm number", "0 means no alarm."),
     2509: ("Software version", "Version of the heat pump software, for example 4.14 (menu 3.1.15). The register holds major x 256 + minor, so the patch level (the 6 in 4.14.6) is not available over REST. The raw_value attribute shows the register."),
-    4030: ("More hot water, minutes remaining", "Remaining time of the temporary hot water increase."),
+    4030: ("More hot water (minutes)", "Write the number of minutes to start a one-time hot water increase: the pump then sets More hot water to 2 and counts the minutes down to 0, one per minute. Reads as the minutes left. The pump's REST interface flags this point read-only; if a write is rejected, use the NIBE Modbus integration for it."),
     4064: ("Operating mode (readback)", "Read-only mirror of the operating mode setting (Auto, Manual, Add. heat)."),
-    4564: ("More hot water", "Temporary hot water increase. The firmware reports no value range, and the meaning of the values is not verified (menu 2.1 offers 3, 6 and 12 hours, Off and One-time increase). Created disabled; test with care."),
+    4564: ("More hot water", "Temporary hot water increase. The pump sets it to 2 (one-time increase) when minutes are written to More hot water (minutes), which is the way to start one. The firmware reports no value range and the other values are not verified (menu 2.1 offers 3, 6 and 12 hours, Off and One-time increase). Created disabled; test with care."),
     6139: ("Solar PV total energy", "Energy reported by the EME PV accessory."),
     6002: ("Solar PV current power", ""),
     6138: ("Solar PV total average power", ""),
@@ -286,7 +292,7 @@ CURATED = {
     5482: ("Brine pump speed mode", "Labels are partially confirmed: 0 manual, 1 auto, 2 fixed delta. The Modbus manual lists register 1319 as 0 auto, 1 manual, so check before writing."),
 }
 USER_FACING = {
-    3667, 3671, 3675, 3679, 3692, 3696, 3697, 3699, 3700, 3701, 3702, 3703,
+    4030, 3667, 3671, 3675, 3679, 3692, 3696, 3697, 3699, 3700, 3701, 3702, 3703,
     3704, 3705, 3706, 3707, 3708, 3709, 3751, 3919, 3920, 3921, 3923, 3924, 3941,
     3949, 5025, 5033, 10613, 32341, 14312, 14313, 14314, 3823,
     3680, 3681, 3682, 3683, 3684, 3685, 3686,
@@ -448,7 +454,7 @@ def info_for(pid: int, point: dict, data: dict | None = None, menu_name: str | N
     reported_mn, reported_mx = reported_bounds(pid, meta)
     div = divisor(pid, point)
     # A holding register the firmware flags read-only and that reports no range is a
-    # status display (for example "More hot water, minutes remaining"), not a setting.
+    # status display, not a setting (unless RANGE_OVERRIDES gives it one, like 4030).
     status_only = (
         flag_mismatch(meta) and mx <= mn and pid not in switch_ids and pid not in button_ids
         and vtype == "integer"
@@ -546,7 +552,7 @@ def info_for(pid: int, point: dict, data: dict | None = None, menu_name: str | N
             reason = "other heat pump family" if other_family else "likely unused hardware"
         elif live and advanced:
             reason = "advanced installer setting"
-        if mismatch:
+        if mismatch and pid != BOOST_MINUTES:
             enabled, category = False, "config"
             reason = "writable per register type (firmware flag says read-only)"
         if no_effect:
