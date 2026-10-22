@@ -36,7 +36,7 @@
 (() => {
 "use strict";
 
-const CARD_VERSION = "0.9.13";
+const CARD_VERSION = "0.9.14";
 const CARD_TAG = "nibe-plant-card";
 
 if (customElements.get(CARD_TAG)) {
