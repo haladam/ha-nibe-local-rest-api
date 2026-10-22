@@ -73,7 +73,8 @@ with sync_playwright() as p:
     check("flow / return / target read from points 8, 10, 1708", (rd.get("Flow"), rd.get("Return"), rd.get("Target")) == ("31.4 °C", "27.2 °C", "30.5 °C"), rd)
     check("brine in / out from points 13 and 14", rd.get("Brine in") == "8.1 °C" and rd.get("Brine out") == "4.2 °C", rd)
     check("compressor frequency and power", rd.get("Compressor") == "52 Hz" and rd.get("Power", "").endswith("W") and "1,240" in rd["Power"], rd)
-    check("tank top temperature (BT7)", rd.get("Top (BT7)") == "50.0 °C", rd)
+    check("tank top temperature (BT7) is shown once, inside the vessel, and not as a readout below the tank", "Top (BT7)" not in rd and pg.page.evaluate("() => [...window.__card.shadowRoot.querySelectorAll('.npc-tank .npc-pill title')].filter(t => t.textContent === 'BT7').length") == 1, rd)
+    check("hot water start and stop temperature sit next to each other below the tank", rd.get("Start") == "2.0 °C" and rd.get("Stop") == "5.0 °C" and list(rd).index("Stop") == list(rd).index("Start") + 1, rd)
     check("mode chip says Heating from priority code 30", "Heating" in r["chips"], r["chips"])
     check("title absent unless configured", r["title"] is None)
     check("no error note when entities are found", r["note"] and not r["note"]["shown"], r["note"])
@@ -81,9 +82,14 @@ with sync_playwright() as p:
     # COP: produced 0.9 / used 0.22 = 4.09 -> 4.1
     check("COP (1 h) = produced / used of the hourly log (0.9 / 0.22 = 4.1)", rd.get("COP (1 h)") == "4.1", rd)
     # hot water stop temperature by demand mode
-    for code, expect in ((0, "5.0 °C"), (1, "45.0 °C"), (2, "70.0 °C"), (4, "–")):
+    for code, start, expect in ((0, "2.0 °C", "5.0 °C"), (1, "40.0 °C", "45.0 °C"), (2, "67.0 °C", "70.0 °C"), (4, "–", "–")):
         pg.set_state(3697, {0: "Small", 1: "Medium", 2: "Large", 4: "Smart control"}[code], raw=float(code)); pg.push()
         check(f"stop temperature for hot water demand {code}: {expect}", pg.read()["readouts"].get("Stop") == expect, pg.read()["readouts"].get("Stop"))
+        check(f"start temperature for hot water demand {code}: {start}", pg.read()["readouts"].get("Start") == start, pg.read()["readouts"].get("Start"))
+    for label in ("Start", "Stop"):
+        pg.page.evaluate("window.__moreInfo.length = 0")
+        pg.page.evaluate("(l) => { [...window.__card.shadowRoot.querySelectorAll('.npc-readout')].find(r => r.querySelector('text').textContent === l).dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true})); }", label)
+        check(f"clicking {label} opens the hot water demand entity", pg.page.evaluate("window.__moreInfo") == [by_point(pg.states, 3697)], pg.page.evaluate("window.__moreInfo"))
     # enum raw_value: state label is German, raw 20 means hot water
     pg.set_state(1758, "Warmwasser", raw=20.0); pg.set_state(2002, "on"); pg.push()
     check("priority taken from raw_value, not from the (translated) state label", "Hot water" in pg.read()["chips"], pg.read()["chips"])
@@ -156,7 +162,7 @@ with sync_playwright() as p:
 
     # ---- languages
     pg = Page(browser, "hotwater", lang="de"); r = pg.read()
-    check("German UI texts", "Fußbodenheizung" in r["texts"] and "Warmwasser" in r["chips"] and "Oben (BT7)" in r["readouts"], (r["chips"], list(r["readouts"])))
+    check("German UI texts", "Fußbodenheizung" in r["texts"] and "Warmwasser" in r["chips"] and {"Start", "Stopp"} <= set(r["readouts"]), (r["chips"], list(r["readouts"])))
     check("German number format (decimal comma)", r["readouts"].get("Außen") == "8,9 °C", r["readouts"].get("Außen")); pg.close()
     pg = Page(browser, "hotwater", lang="fr"); r = pg.read()
     check("unknown language falls back to English", "Hot water" in r["chips"], r["chips"]); pg.close()

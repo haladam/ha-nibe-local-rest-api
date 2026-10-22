@@ -53,8 +53,10 @@ Notes
 * "COP (1 h)" is the heat produced divided by the energy used in the last full hour, from the
   pump's own hourly energy log. It is an estimate and shows a dash when the pump used almost
   nothing in that hour.
-* "Stop" is the hot water stop temperature of the selected hot water demand (small, medium or
-  large). With smart control the pump decides and the card shows a dash.
+* "Start" and "Stop" below the tank are the hot water start and stop temperatures of the selected
+  hot water demand (small, medium or large): the temperatures at which the pump starts and stops
+  charging. With smart control the pump decides and the card shows a dash. The top temperature
+  (BT7) is shown once, inside the hot water vessel.
 * In summer the circuit panel turns into the cooling circuit ("Ceiling cooling" by default,
   `circuit.cooling_type: same` keeps the heating drawing). Flow and return are the pump's
   supply and return line sensors (BT2, BT3), the target is the calculated cooling supply

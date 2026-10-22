@@ -13,6 +13,7 @@ const SLOT_POINTS = {
   cooling_pump: 3149, degree_minutes: 781, alarm: 3375,
   boost_minutes: 4030, boost_status: 1942, demand: 3697, flow_setting: 3976,
   hw_stop_low: 3705, hw_stop_normal: 3704, hw_stop_high: 3703,
+  hw_start_low: 3701, hw_start_normal: 3700, hw_start_high: 3699,
   calc_supply_cooling: 2695,
   pv_surplus: 14314, pv_pump: 6002,
   produced_heating: 25154, produced_hw: 25155, produced_cooling: 25157,
@@ -198,12 +199,20 @@ class Plant {
     return this.priority() === "heating";
   }
 
-  /** Stop temperature of the selected hot water demand (Small / Medium / Large). */
-  hotWaterStop() {
+  /** Start or stop temperature ("start" / "stop") of the selected hot water demand (Small / Medium / Large). */
+  hotWaterLimit(kind) {
     const demand = this.raw("demand");
-    // Smart control (4) has no fixed stop temperature, the pump decides; unknown codes are not guessed
-    const slot = demand === 0 ? "hw_stop_low" : demand === 1 ? "hw_stop_normal" : demand === 2 ? "hw_stop_high" : null;
-    return slot ? this.num(slot) : null;
+    // Smart control (4) has no fixed temperatures, the pump decides; unknown codes are not guessed
+    const size = demand === 0 ? "low" : demand === 1 ? "normal" : demand === 2 ? "high" : null;
+    return size ? this.num(`hw_${kind}_${size}`) : null;
+  }
+
+  hotWaterStop() {
+    return this.hotWaterLimit("stop");
+  }
+
+  hotWaterStart() {
+    return this.hotWaterLimit("start");
   }
 
   /** Coefficient of performance of the last hour from the pump's own energy log. */

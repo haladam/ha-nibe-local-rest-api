@@ -405,18 +405,20 @@ function drawTank(scene, box, cfg) {
   }
 
   const y = compact ? box.y + 256 : box.y + box.h - 52;
-  drawReadout(scene, group, box.x + 14, y, `${t.top} (BT7)`, tempReadout("hw_top"), { strong: true, slot: "hw_top" });
-  drawReadout(
-    scene,
-    group,
-    box.x + 92,
-    y,
-    t.stop,
-    (plant, hass) => {
-      const v = plant.hotWaterStop();
-      return v === null ? "–" : { text: fmt(hass, v, 1, "°C"), color: tempTextColor(v) };
-    },
-    { slot: "demand" }
+  // the temperatures at which the pump starts and stops charging the hot water (BT7 itself is in the vessel)
+  [[box.x + 14, t.start, "hotWaterStart"], [box.x + 92, t.stop, "hotWaterStop"]].forEach(([x, label, read]) =>
+    drawReadout(
+      scene,
+      group,
+      x,
+      y,
+      label,
+      (plant, hass) => {
+        const v = plant[read]();
+        return v === null ? "–" : { text: fmt(hass, v, 1, "°C"), color: tempTextColor(v) };
+      },
+      { slot: "demand" }
+    )
   );
   drawChip(
     scene,

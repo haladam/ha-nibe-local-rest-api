@@ -176,7 +176,7 @@ const TEXTS = {
     outside: "Outside",
     heater: "Heater",
     tank: "Hot water",
-    top: "Top",
+    start: "Start",
     charging: "Charging",
     stop: "Stop",
     boost: "Boost",
@@ -215,7 +215,7 @@ const TEXTS = {
     outside: "Außen",
     heater: "Heizstab",
     tank: "Warmwasser",
-    top: "Oben",
+    start: "Start",
     charging: "Ladung",
     stop: "Stopp",
     boost: "Boost",
@@ -260,6 +260,7 @@ const SLOT_POINTS = {
   cooling_pump: 3149, degree_minutes: 781, alarm: 3375,
   boost_minutes: 4030, boost_status: 1942, demand: 3697, flow_setting: 3976,
   hw_stop_low: 3705, hw_stop_normal: 3704, hw_stop_high: 3703,
+  hw_start_low: 3701, hw_start_normal: 3700, hw_start_high: 3699,
   calc_supply_cooling: 2695,
   pv_surplus: 14314, pv_pump: 6002,
   produced_heating: 25154, produced_hw: 25155, produced_cooling: 25157,
@@ -445,12 +446,20 @@ class Plant {
     return this.priority() === "heating";
   }
 
-  /** Stop temperature of the selected hot water demand (Small / Medium / Large). */
-  hotWaterStop() {
+  /** Start or stop temperature ("start" / "stop") of the selected hot water demand (Small / Medium / Large). */
+  hotWaterLimit(kind) {
     const demand = this.raw("demand");
-    // Smart control (4) has no fixed stop temperature, the pump decides; unknown codes are not guessed
-    const slot = demand === 0 ? "hw_stop_low" : demand === 1 ? "hw_stop_normal" : demand === 2 ? "hw_stop_high" : null;
-    return slot ? this.num(slot) : null;
+    // Smart control (4) has no fixed temperatures, the pump decides; unknown codes are not guessed
+    const size = demand === 0 ? "low" : demand === 1 ? "normal" : demand === 2 ? "high" : null;
+    return size ? this.num(`hw_${kind}_${size}`) : null;
+  }
+
+  hotWaterStop() {
+    return this.hotWaterLimit("stop");
+  }
+
+  hotWaterStart() {
+    return this.hotWaterLimit("start");
   }
 
   /** Coefficient of performance of the last hour from the pump's own energy log. */
@@ -1178,18 +1187,20 @@ function drawTank(scene, box, cfg) {
   }
 
   const y = compact ? box.y + 256 : box.y + box.h - 52;
-  drawReadout(scene, group, box.x + 14, y, `${t.top} (BT7)`, tempReadout("hw_top"), { strong: true, slot: "hw_top" });
-  drawReadout(
-    scene,
-    group,
-    box.x + 92,
-    y,
-    t.stop,
-    (plant, hass) => {
-      const v = plant.hotWaterStop();
-      return v === null ? "–" : { text: fmt(hass, v, 1, "°C"), color: tempTextColor(v) };
-    },
-    { slot: "demand" }
+  // the temperatures at which the pump starts and stops charging the hot water (BT7 itself is in the vessel)
+  [[box.x + 14, t.start, "hotWaterStart"], [box.x + 92, t.stop, "hotWaterStop"]].forEach(([x, label, read]) =>
+    drawReadout(
+      scene,
+      group,
+      x,
+      y,
+      label,
+      (plant, hass) => {
+        const v = plant[read]();
+        return v === null ? "–" : { text: fmt(hass, v, 1, "°C"), color: tempTextColor(v) };
+      },
+      { slot: "demand" }
+    )
   );
   drawChip(
     scene,

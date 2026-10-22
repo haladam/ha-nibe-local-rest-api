@@ -4,6 +4,13 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.9.13 - 2026-10-22
+
+* Card: below the tank, the readout of the top temperature (BT7) is replaced by the hot water start
+  temperature, so "Start" and "Stop" sit next to each other. BT7 was shown twice (in the vessel and
+  below the tank); it stays in the vessel. Start follows the selected hot water demand like Stop does
+  (points 3699, 3700, 3701 for large, medium, small) and shows a dash with smart control.
+
 ## 0.9.12 - 2026-10-22
 
 * Card: fewer crossing pipes. The heating circuit's supply and return ports are swapped (supply
