@@ -4,6 +4,18 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.12.1 - 2026-10-24
+
+* Brings the version numbers back in line: nothing in the code changed since 0.11.1. The GitHub release
+  v0.12.0 was created by hand on the 0.11.1 commit, so its manifest still said 0.11.1, the release workflow
+  refused to build it (tag and manifest version must match) and it has no zip and no notes. From this
+  release on the manifest, the tag and HACS all say the same version again. Treat 0.12.0 as 0.11.1.
+* What 0.11.1 changed (no release of it was published): the seasonal and lifetime COP sensors show a value
+  from 0.25 kWh of counted electricity (the 24 h COP from 0.1 kWh) instead of 1 kWh, which took hours on a
+  pump that mostly runs at minimum speed. The COP sensors have a `status` attribute that says why there is
+  no value yet, for example `collecting data: 0.12 of 0.25 kWh of electricity`. The COP from the pump's own
+  counters keeps 1 kWh, as those counters only change in steps of 0.1 kWh.
+
 ## 0.11.1 - 2026-10-24
 
 * The seasonal and lifetime COP sensors stayed unknown for hours on a pump that mostly runs at minimum speed
