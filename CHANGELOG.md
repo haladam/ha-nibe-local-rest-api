@@ -4,6 +4,18 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.11.1 - 2026-10-24
+
+* The seasonal and lifetime COP sensors stayed unknown for hours on a pump that mostly runs at minimum speed
+  (it draws about 0.2 kWh an hour), because they waited for 1 kWh of counted electricity. They now show a value
+  from 0.25 kWh (the 24 h COP from 0.1 kWh, was 0.2). The COP from the pump's own counters keeps 1 kWh, as
+  those counters only change in steps of 0.1 kWh.
+* The COP sensors say why they have no value: the `status` attribute reads `collecting data: 0.12 of 0.25 kWh
+  of electricity` until there is enough, `ok` afterwards. On the 24 h sensors `status` now describes the 24 h
+  value; the state of the current reading is only on the 15-minute sensors.
+* Checked against a real points table of an S1155: with its operating point the pipeline works, the
+  thresholds were the problem.
+
 ## 0.11.0 - 2026-10-24
 
 * **Seasonal and lifetime COP**, separately for heating, hot water and total: *COP heating (season)*,

@@ -123,9 +123,18 @@ check("the season ending 1 October 2026 starts on 1 October 2025", close(f.tot.s
 check("today: its own energy and run time only", close(f.tot.today("2026-10-24")["run_s"], 3600, 1e-3) and close(f.tot.today("2026-10-01")["run_s"], 7200, 1e-3) and f.tot.today("2026-12-01")["starts"] == 0)
 check("season_since: the season's first day or the day counting began, whichever is later",
       f.tot.season_since("2026-10-24") == "2026-10-01" and f.tot.season_since("2027-03-01") == "2026-10-01" and f.tot.season_since("2026-09-30") == "2026-09-30")
-f2 = Feed(); f2.hold(600, **STEADY)
+f2 = Feed(); f2.hold(300, **STEADY)
 check("season_since: counting began after the season started", f2.tot.season_since("2026-10-24") == "2026-10-24")
-check("a COP needs 1 kWh of electricity first", f2.tot.cop(*f2.tot.lifetime_sums("heating")) is None and f.tot.cop(*f.tot.lifetime_sums("heating")) is not None)
+check("a COP needs 0.25 kWh of electricity first (5 minutes at 2 kW is 0.17)", f2.tot.cop(*f2.tot.lifetime_sums("heating")) is None and f.tot.cop(*f.tot.lifetime_sums("heating")) is not None)
+check("... a different minimum can be asked for", f2.tot.cop(*f2.tot.lifetime_sums("heating"), minimum=0.1) is not None and f2.tot.cop(*f2.tot.lifetime_sums("heating"), minimum=1.0) is None)
+check("collecting: says how far it is", f2.tot.collecting(0.17) == "collecting data: 0.17 of 0.25 kWh of electricity" and f2.tot.collecting(0.3) == "ok" and f2.tot.collecting(0.4, 1.0) == "collecting data: 0.40 of 1 kWh of electricity")
+
+# the real operating point of an S1155 at minimum speed (24 Hz, 206 W, 15.1 L/min, 26.1 / 24.0 degC) draws 0.2 kWh an hour
+REAL = dict(priority=30, valve_hot_water=0, compressor_state=60, compressor_on=1, frequency_hz=24, power_w=206, flow_lpm=15.1, supply_c=26.1, return_c=24.0, defrost=0)
+fr = Feed(); fr.hold(3600, **REAL)
+check("at minimum speed one hour is not enough electricity for a seasonal COP yet", fr.tot.cop(*fr.tot.lifetime_sums("total")) is None, fr.tot.lifetime_sums("total"))
+fr.hold(1200, **REAL)
+check("... 80 minutes are: COP 10.6", close(fr.tot.cop(*fr.tot.lifetime_sums("total")), 15.1 / 60 * 4.15 * 2.1 * 1000 / 206, 1e-6), fr.tot.cop(*fr.tot.lifetime_sums("total")))
 check("a COP without any electricity is unknown", f2.tot.cop(0.0, 0.0) is None and f2.tot.cop(5.0, 0.0) is None)
 
 # a September start of the season
@@ -265,10 +274,12 @@ check("COP sensors: names and unique ids",
       sorted(e._attr_name for e in cop.values()) == ["COP heating (lifetime)", "COP heating (season)", "COP hot water (lifetime)", "COP hot water (season)", "COP total (lifetime)", "COP total (season)"]
       and sorted(e._attr_unique_id for e in cop.values()) == ["S_cop_heating_lifetime", "S_cop_heating_season", "S_cop_hot_water_lifetime", "S_cop_hot_water_season", "S_cop_total_lifetime", "S_cop_total_season"],
       sorted(e._attr_name for e in cop.values()))
+check("COP sensors: hot water says why it has no value", cop[("hot_water", "season")].extra_state_attributes["status"] == "collecting data: 0.00 of 0.25 kWh of electricity")
 check("COP sensors: heating and total show the COP, hot water has no energy yet",
       close(cop[("heating", "season")].native_value, 4.15, 1e-3) and close(cop[("heating", "lifetime")].native_value, 4.15, 1e-3)
       and close(cop[("total", "season")].native_value, 4.15, 1e-3) and cop[("hot_water", "season")].native_value is None and cop[("hot_water", "lifetime")].native_value is None)
 a = cop[("heating", "season")].extra_state_attributes
+check("COP sensors: status says ok", a["status"] == "ok")
 check("COP sensors: season attributes", a["season_start"] == "2026-10-01" and a["since"] == "2026-10-24" and a["previous_season_cop"] is None and close(a["heat_kwh"] / a["electricity_kwh"], 4.15, 0.01), a)
 a = cop[("heating", "lifetime")].extra_state_attributes
 check("COP sensors: lifetime attributes", a["since"] == "2026-10-24" and "season_start" not in a and a["electricity_kwh"] > 2.0, a)
@@ -277,9 +288,11 @@ pump = {s: sensor.NibeCopPumpSensor(c, s) for s in ("season", "lifetime")}
 check("pump-counter COP: lifetime is the pump's Tot. production over Tot. consumption", close(pump["lifetime"].native_value, 46183.4 / 9534.5, 1e-3) and pump["lifetime"]._attr_unique_id == "S_cop_pump_lifetime"
       and pump["lifetime"]._attr_name == "COP pump counters (lifetime)", pump["lifetime"].native_value)
 check("pump-counter COP: season uses the change since the first reading, and waits for 1 kWh",
-      pump["season"].native_value is None and close(pump["season"].extra_state_attributes["heat_kwh"], 8.3, 0.01), pump["season"].extra_state_attributes)
+      pump["season"].native_value is None and close(pump["season"].extra_state_attributes["heat_kwh"], 8.3, 0.01)
+      and pump["season"].extra_state_attributes["status"] == "collecting data: 0.50 of 1 kWh of electricity", pump["season"].extra_state_attributes)
 api.c.update(total_heat=46190.1, total_el=9537.1)
 poll(c)
+check("pump-counter COP: lifetime status ok", pump["lifetime"].extra_state_attributes["status"] == "ok")
 check("pump-counter COP: season value once there is enough electricity", close(pump["season"].native_value, (46190.1 - 46175.1) / (9537.1 - 9534.0), 1e-3), pump["season"].native_value)
 check("pump-counter COP: season attributes", pump["season"].extra_state_attributes["season_start"] == "2026-10-01" and pump["season"].extra_state_attributes["since"] == "2026-10-24")
 

@@ -61,7 +61,7 @@ class Settings:
     live_window_s: float = 900.0
     min_live_valid_s: float = 120.0  # counted seconds in the live window before a value is shown
     long_window_s: float = 86400.0
-    min_long_energy_kwh: float = 0.2  # electricity in the long window before a value is shown
+    min_long_energy_kwh: float = 0.1  # electricity in the long window before a value is shown (0.2 kW at minimum speed: 30 min)
 
 
 @dataclass

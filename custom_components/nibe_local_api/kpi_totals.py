@@ -34,7 +34,8 @@ class TotalsSettings:
     max_heat_kw: float = 30.0       # more than this from one reading is a sensor glitch
     max_start_step: int = 20        # starts counted between two readings at most
     keep_days: int = 800            # days of history kept for seasons
-    min_energy_kwh: float = 1.0     # electricity needed before a COP is shown
+    min_energy_kwh: float = 0.25    # electricity needed before a COP is shown (about an hour at minimum speed)
+    min_pump_energy_kwh: float = 1.0  # the pump's own counters have 0.1 kWh steps: needs more
 
 
 def season_start(day: date, month: int) -> date:
@@ -155,8 +156,14 @@ class EnergyTotals:
                 heat, electricity = heat + rec[b][0], electricity + rec[b][1]
         return heat, electricity
 
-    def cop(self, heat: float, electricity: float) -> float | None:
-        return heat / electricity if electricity >= self.cfg.min_energy_kwh else None
+    def cop(self, heat: float, electricity: float, minimum: float | None = None) -> float | None:
+        minimum = self.cfg.min_energy_kwh if minimum is None else minimum
+        return heat / electricity if electricity >= max(minimum, 1e-9) else None
+
+    def collecting(self, electricity: float, minimum: float | None = None) -> str:
+        """Status text for a COP that is not shown yet because there is too little data."""
+        minimum = self.cfg.min_energy_kwh if minimum is None else minimum
+        return "ok" if electricity >= minimum else f"collecting data: {electricity:.2f} of {minimum:g} kWh of electricity"
 
     def season_since(self, today: str) -> str:
         """Where the season figures really start: the season's first day or when counting began."""

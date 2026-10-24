@@ -192,9 +192,15 @@ class NibeCopSensor(CoordinatorEntity, SensorEntity):
         tracker = self.coordinator.kpi
         valid, heat, power = tracker.window(self._mode, self._window_s)
         last = tracker.last
+        if self._long:
+            enough = power >= tracker.cfg.min_long_energy_kwh
+            status = "ok" if enough else (
+                f"collecting data: {power:.2f} of {tracker.cfg.min_long_energy_kwh:g} kWh of electricity")
+        else:
+            status = last.status if last else None
         return {
-            "status": last.status if last else None,
-            "settling_seconds_left": round(last.settle_left_s) if last else None,
+            "status": status,
+            "settling_seconds_left": None if self._long or not last else round(last.settle_left_s),
             "window_minutes": round(self._window_s / 60),
             "counted_minutes": round(valid / 60, 1),
             "heat_kwh": round(heat, 3),
@@ -289,7 +295,7 @@ class NibeCopPeriodSensor(CoordinatorEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
     _unrecorded_attributes = frozenset({
-        "heat_kwh", "electricity_kwh", "since", "season_start", "previous_season_cop",
+        "status", "heat_kwh", "electricity_kwh", "since", "season_start", "previous_season_cop",
     })
 
     def __init__(self, coordinator, mode: str, scope: str) -> None:
@@ -313,7 +319,10 @@ class NibeCopPeriodSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         totals, today = self.coordinator.totals, self.coordinator._today()
         heat, electricity = self._sums()
-        attrs = {"heat_kwh": round(heat, 2), "electricity_kwh": round(electricity, 2)}
+        attrs = {
+            "status": totals.collecting(electricity),
+            "heat_kwh": round(heat, 2), "electricity_kwh": round(electricity, 2),
+        }
         if self._scope == "lifetime":
             attrs["since"] = totals.since
             return attrs
@@ -338,7 +347,7 @@ class NibeCopPumpSensor(CoordinatorEntity, SensorEntity):
     _attr_icon = "mdi:heat-pump"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
-    _unrecorded_attributes = frozenset({"heat_kwh", "electricity_kwh", "since", "season_start"})
+    _unrecorded_attributes = frozenset({"status", "heat_kwh", "electricity_kwh", "since", "season_start"})
 
     def __init__(self, coordinator, scope: str) -> None:
         super().__init__(coordinator)
@@ -358,13 +367,15 @@ class NibeCopPumpSensor(CoordinatorEntity, SensorEntity):
         heat, electricity = self._sums()
         if heat is None or electricity is None:
             return None
-        return self.coordinator.totals.cop(heat, electricity)
+        totals = self.coordinator.totals
+        return totals.cop(heat, electricity, totals.cfg.min_pump_energy_kwh)
 
     @property
     def extra_state_attributes(self):
         totals = self.coordinator.totals
         heat, electricity = self._sums()
         attrs = {
+            "status": "no data" if electricity is None else totals.collecting(electricity, totals.cfg.min_pump_energy_kwh),
             "heat_kwh": None if heat is None else round(heat, 1),
             "electricity_kwh": None if electricity is None else round(electricity, 1),
         }

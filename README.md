@@ -117,7 +117,9 @@ performance factor; it is lower than the steady-state COP by what the start-ups 
 
 *Total* is heating, hot water and the compressor running in other situations (valve moving, pool,
 cooling) together. The season starts on the 1st of the month chosen under **Configure** (*Season starts
-in month*, default 10 = October). A COP is shown after 1 kWh of electricity.
+in month*, default 10 = October). A COP is shown once 0.25 kWh of electricity has been counted (the
+pump's own counters: 1 kWh, as they only change in steps of 0.1 kWh). At minimum speed the compressor draws
+about 0.2 kWh an hour, so that takes an hour or more; the `status` attribute shows how far it is.
 
 ### Energy counters
 
@@ -142,7 +144,7 @@ starts. Many short runs are what wears a heat pump out; one long run per cycle i
 ### Things to know
 
 * Everything is fed once per full table (every 30 s by default). The 15-minute COP appears after 2
-  minutes of counted data, the 24 h COP after 0.2 kWh of electricity.
+  minutes of counted data, the 24 h COP after 0.1 kWh of electricity.
 * **Restarts:** the 24 h window of the steady-state COP is kept in memory only and starts empty after a
   restart. The running totals behind the energy counters, the seasonal and the lifetime COP are saved
   every five minutes and when Home Assistant stops, and restored at start-up (file
