@@ -21,6 +21,12 @@ const SLOT_POINTS = {
   used_aux_heating: 25162, used_aux_hw: 25163,
 };
 
+/**
+ * Slots read from the integration's calculated sensors (COP of the last 15 minutes and of the last 24 hours).
+ * They have no NIBE point; each carries its name in the `nibe_calc` attribute.
+ */
+const SLOT_CALCS = ["cop_heating", "cop_hot_water", "cop_heating_24h", "cop_hot_water_24h"];
+
 /** Operating priority codes (point 1758). */
 const PRIORITY = { 10: "off", 20: "hot_water", 30: "heating", 40: "pool", 60: "cooling" };
 
@@ -29,13 +35,14 @@ const UNAVAILABLE = new Set(["unavailable", "unknown", "none", ""]);
 /**
  * Resolves slots to entities and reads their values. A slot is an explicit entity
  * from the card's `entities:` block, otherwise the entity of this integration that
- * carries the slot's NIBE point id in its `point_id` attribute.
+ * carries the slot's NIBE point id in its `point_id` attribute (the calculated COP sensors: their `nibe_calc`).
  */
 class Plant {
   constructor(config) {
     this.config = config || {};
     this.hass = undefined;
     this._index = new Map();
+    this._calcIndex = new Map();
     this._indexKey = undefined;
     this._indexAt = 0;
   }
@@ -58,13 +65,19 @@ class Plant {
     const hass = this.hass;
     const device = this.config.device;
     const found = new Map();
+    const calcs = new Map();
     for (const entityId of Object.keys(hass.states)) {
       const attrs = hass.states[entityId].attributes;
-      if (!attrs || typeof attrs.point_id !== "number" || typeof attrs.nibe_title !== "string") continue;
+      if (!attrs) continue;
+      const isPoint = typeof attrs.point_id === "number" && typeof attrs.nibe_title === "string";
+      const isCalc = typeof attrs.nibe_calc === "string";
+      if (!isPoint && !isCalc) continue;
       if (device && hass.entities && hass.entities[entityId] && hass.entities[entityId].device_id !== device) continue;
-      if (!found.has(attrs.point_id)) found.set(attrs.point_id, entityId);
+      if (isPoint && !found.has(attrs.point_id)) found.set(attrs.point_id, entityId);
+      if (isCalc && !calcs.has(attrs.nibe_calc)) calcs.set(attrs.nibe_calc, entityId);
     }
     this._index = found;
+    this._calcIndex = calcs;
     this._indexKey = hass.entities;
     this._indexAt = Date.now();
   }
@@ -72,6 +85,7 @@ class Plant {
   entityId(slot) {
     const explicit = this.config.entities && this.config.entities[slot];
     if (explicit) return explicit;
+    if (SLOT_CALCS.includes(slot)) return this._calcIndex.get(slot);
     const point = SLOT_POINTS[slot];
     return point === undefined ? undefined : this._index.get(point);
   }
@@ -155,7 +169,7 @@ class Plant {
   /** Signature of everything the drawing reads, to skip redraws that change nothing. */
   signature() {
     const parts = [];
-    for (const slot of Object.keys(SLOT_POINTS)) {
+    for (const slot of [...Object.keys(SLOT_POINTS), ...SLOT_CALCS]) {
       const st = this.stateObj(slot);
       parts.push(st ? `${st.state}|${st.attributes && st.attributes.raw_value}` : "-");
     }
@@ -215,8 +229,30 @@ class Plant {
     return this.hotWaterLimit("start");
   }
 
+  /**
+   * The COP to show: what the compressor is doing now, as calculated by the integration (last 15 minutes, only
+   * while it runs steadily); else the last 24 hours of that mode; else the pump's own energy log of the last
+   * hour. Returns { value, source: "live" | "24h" | "log", slot, mode } or null.
+   */
+  copReading() {
+    const mode = this.priority();
+    // cooling and the pool are not part of the calculation; the energy log covers them
+    if (!this.cooling() && (mode === null || mode === "off" || mode === "heating" || mode === "hot_water")) {
+      const steps =
+        mode === "heating" || mode === "hot_water"
+          ? [["live", `cop_${mode}`], ["24h", `cop_${mode}_24h`]]
+          : [["24h", "cop_heating_24h"], ["24h", "cop_hot_water_24h"]];
+      for (const [source, slot] of steps) {
+        const value = this.num(slot);
+        if (value !== null && value > 0) return { value, source, slot, mode: slot.includes("hot_water") ? "hot_water" : "heating" };
+      }
+    }
+    const value = this.logCop();
+    return value === null ? null : { value, source: "log", slot: "produced_heating", mode: null };
+  }
+
   /** Coefficient of performance of the last hour from the pump's own energy log. */
-  cop() {
+  logCop() {
     const sum = (slots) => {
       let total = 0;
       let seen = false;

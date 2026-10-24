@@ -174,6 +174,70 @@ with sync_playwright() as p:
     pg = Page(browser, "heating", extra=extra, config={"type": "custom:nibe-plant-card", "entities": {"outdoor": "sensor.does_not_exist"}})
     check("entities: override pointing nowhere shows a dash instead of falling back", pg.read()["readouts"].get("Outside") == "–", pg.read()["readouts"].get("Outside")); pg.close()
 
+    # ---- calculated COP (the integration's sensors carry a nibe_calc attribute)
+    def calc(**values):
+        out = {}
+        for slot, value in values.items():
+            eid = "sensor.nibe_s1155_" + slot
+            out[eid] = {"entity_id": eid, "state": value, "attributes": {"nibe_calc": slot, "state_class": "measurement"}}
+        return out
+    COPS = {"cop_heating": "10.6", "cop_hot_water": "3.2", "cop_heating_24h": "9.8", "cop_hot_water_24h": "3.1"}
+    def cop_readouts(r):
+        return {k: v for k, v in r["readouts"].items() if k.startswith("COP")}
+    TITLE = """() => { const r = [...window.__card.shadowRoot.querySelectorAll('.npc-readout')].find(r => r.querySelector('text').textContent.startsWith('COP'));
+                      return r ? (r.querySelector('title') || {}).textContent : null; }"""
+
+    pg = Page(browser, "heating", extra=calc(**COPS)); r = pg.read()
+    check("calculated COP: heating and running, the live value of the last 15 minutes is shown as 'COP'", cop_readouts(r) == {"COP": "10.6"}, cop_readouts(r))
+    check("calculated COP: the tooltip names the mode and the source", pg.page.evaluate(TITLE) == "Heating: calculated from flow and temperature rise, last 15 minutes", pg.page.evaluate(TITLE))
+    pg.page.evaluate("window.__moreInfo.length = 0")
+    pg.page.evaluate("() => { const r = [...window.__card.shadowRoot.querySelectorAll('.npc-readout')].find(r => r.querySelector('text').textContent === 'COP'); r.dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true})); }")
+    check("calculated COP: clicking it opens the sensor it came from", pg.page.evaluate("window.__moreInfo") == ["sensor.nibe_s1155_cop_heating"], pg.page.evaluate("window.__moreInfo"))
+    pg.states["sensor.nibe_s1155_cop_heating"]["state"] = "11.2"; pg.push()
+    check("calculated COP: a new value of the sensor is drawn", cop_readouts(pg.read()) == {"COP": "11.2"}, cop_readouts(pg.read()))
+    pg.states["sensor.nibe_s1155_cop_heating"]["state"] = "unknown"; pg.push()
+    r = pg.read()
+    check("calculated COP: live value unknown (settling) -> the 24 h value of heating, labelled", cop_readouts(r) == {"COP (24 h)": "9.8"}, cop_readouts(r))
+    check("calculated COP: the tooltip says 24 hours", pg.page.evaluate(TITLE) == "Heating: calculated, last 24 hours", pg.page.evaluate(TITLE))
+    pg.states["sensor.nibe_s1155_cop_heating_24h"]["state"] = "unavailable"; pg.push()
+    r = pg.read()
+    check("calculated COP: nothing calculated yet -> the pump's own hourly log (0.9 / 0.22 = 4.1), labelled (1 h)", cop_readouts(r) == {"COP (1 h)": "4.1"}, cop_readouts(r))
+    check("calculated COP: the tooltip says it is the pump's log", pg.page.evaluate(TITLE) == "from the pump's energy log, last hour", pg.page.evaluate(TITLE)); pg.close()
+
+    pg = Page(browser, "hotwater", extra=calc(**COPS)); r = pg.read()
+    check("calculated COP: charging hot water shows the hot water COP, not the heating one", cop_readouts(r) == {"COP": "3.2"}, cop_readouts(r))
+    check("calculated COP: the tooltip says hot water", pg.page.evaluate(TITLE).startswith("Hot water: "), pg.page.evaluate(TITLE))
+    pg.states["sensor.nibe_s1155_cop_hot_water"]["state"] = "unknown"; pg.push()
+    check("calculated COP: hot water live unknown -> the 24 h hot water value, never the heating one", cop_readouts(pg.read()) == {"COP (24 h)": "3.1"}, cop_readouts(pg.read()))
+    pg.states["sensor.nibe_s1155_cop_hot_water_24h"]["state"] = "unknown"; pg.push()
+    pg0 = Page(browser, "hotwater"); log_only = cop_readouts(pg0.read()); pg0.close()
+    check("calculated COP: no hot water value at all -> the hourly log (what the card showed before), not the heating COP",
+          list(log_only) == ["COP (1 h)"] and cop_readouts(pg.read()) == log_only, (log_only, cop_readouts(pg.read()))); pg.close()
+
+    pg = Page(browser, "idle", overrides={1758: 10, 1973: 0, 1799: 0, 2556: 20}, extra=calc(**COPS)); r = pg.read()
+    check("calculated COP: pump on standby -> the 24 h heating COP stays on the card", cop_readouts(r) == {"COP (24 h)": "9.8"}, cop_readouts(r))
+    pg.states["sensor.nibe_s1155_cop_heating_24h"]["state"] = "unknown"; pg.push()
+    check("calculated COP: on standby with no heating value -> the 24 h hot water COP", cop_readouts(pg.read()) == {"COP (24 h)": "3.1"}, cop_readouts(pg.read())); pg.close()
+
+    pg = Page(browser, "cooling", extra=calc(**COPS)); r = pg.read()
+    check("calculated COP: passive cooling still shows a dash (no heating COP from the day before)", cop_readouts(r) == {"COP (1 h)": "–"}, cop_readouts(r)); pg.close()
+    pg = Page(browser, "cooling", overrides={1799: 40, 1973: 1, 25157: 1.2, 25161: 0.3, 25158: 0.0, 25159: 0.0, 25162: 0.0, 25163: 0.0}, extra=calc(**COPS)); r = pg.read()
+    check("calculated COP: active cooling uses the log (cooling is not part of the calculation)", cop_readouts(r) == {"COP (1 h)": "4.0"}, cop_readouts(r)); pg.close()
+
+    pg = Page(browser, "heating", extra=calc(**COPS), lang="de"); r = pg.read()
+    check("calculated COP: German tooltip", pg.page.evaluate(TITLE) == "Heizen: berechnet aus Durchfluss und Temperaturdifferenz, letzte 15 Minuten", pg.page.evaluate(TITLE)); pg.close()
+
+    pg = Page(browser, "heating", extra=calc(**COPS), config={"type": "custom:nibe-plant-card", "entities": {"cop_heating": "sensor.my_cop"}},
+              mutate=lambda s, e: s.update({"sensor.my_cop": {"entity_id": "sensor.my_cop", "state": "7.7", "attributes": {}}}))
+    check("calculated COP: the slot can be named in entities", cop_readouts(pg.read()) == {"COP": "7.7"}, cop_readouts(pg.read())); pg.close()
+
+    def other_pump_first(states, entities):
+        eid = "sensor.other_pump_cop_heating"
+        states.update({eid: {"entity_id": eid, "state": "2.2", "attributes": {"nibe_calc": "cop_heating"}}}); entities[eid] = {"entity_id": eid, "device_id": "dev_other"}
+        items = [(eid, states.pop(eid))] + list(states.items()); states.clear(); states.update(items)
+    pg = Page(browser, "heating", extra=calc(**COPS), mutate=other_pump_first, config={"type": "custom:nibe-plant-card", "device": "dev_nibe"})
+    check("calculated COP: the device filter also applies to the calculated sensors", cop_readouts(pg.read()) == {"COP": "10.6"}, cop_readouts(pg.read())); pg.close()
+
     # ---- device filter
     def second_device(states, entities):
         clone = {}

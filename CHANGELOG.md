@@ -4,6 +4,20 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.13.0 - 2026-10-24
+
+* The card's COP readout shows the calculated COP now. While the compressor heats or charges hot water it
+  shows the COP of that mode over the last 15 minutes ("COP"). Until that value exists (the first minutes
+  after a start, a defrost or a change of mode) it shows the COP of the last 24 hours ("COP (24 h)"), on
+  standby the 24 h COP of heating, or of hot water if there is none for heating. If nothing has been
+  calculated yet it falls back to what the card showed before: "COP (1 h)" from the pump's hourly energy
+  log. Hovering over the value says which one it is and tapping it opens that sensor. Cooling still uses the
+  energy log, because the calculation does not cover it. The four slots can be named under `entities`
+  (`cop_heating`, `cop_hot_water`, `cop_heating_24h`, `cop_hot_water_24h`).
+* The four steady-state COP sensors have a `nibe_calc` attribute that the card uses to find them (kept out
+  of the database like the other changing attributes). The card comes with the integration, so there is
+  nothing to configure.
+
 ## 0.12.2 - 2026-10-24
 
 * Fixes the calculated COP, heat output, energy totals and compressor starts staying Unknown on a real Home

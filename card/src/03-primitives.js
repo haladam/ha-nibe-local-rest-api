@@ -89,7 +89,9 @@ function drawReadout(scene, group, x, y, label, read, options) {
     class: opts.strong ? "npc-value npc-value-strong" : "npc-value",
     "text-anchor": anchor,
   });
+  const tipNode = opts.title ? svgEl("title") : null;
   block.append(labelNode, valueNode);
+  if (tipNode) block.appendChild(tipNode);
   group.appendChild(block);
   if (opts.slot) attachMoreInfo(scene, block, opts.slot);
   scene.add((plant, hass) => {
@@ -100,6 +102,7 @@ function drawReadout(scene, group, x, y, label, read, options) {
     const color = out && typeof out === "object" ? out.color : null;
     valueNode.style.fill = color || "";
     if (opts.label) labelNode.textContent = opts.label(plant, hass);
+    if (tipNode) tipNode.textContent = opts.title(plant, hass) || "";
   });
   return block;
 }

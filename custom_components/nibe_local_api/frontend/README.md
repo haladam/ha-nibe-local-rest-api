@@ -39,7 +39,8 @@ entities:                         # replace what the card would find
 
 Slots for `entities`: `outdoor`, `supply`, `return`, `calc_supply`, `calc_supply_cooling`, `hw_top`, `hw_charge`,
 `brine_in`, `brine_out`, `compressor_hz`, `power`, `gp1`, `gp2`, `priority`, `aux_power`,
-`valve_hw`, `circ_pump`, `cooling_pump`, `degree_minutes`, `alarm`, `boost_minutes`.
+`valve_hw`, `circ_pump`, `cooling_pump`, `degree_minutes`, `alarm`, `boost_minutes`, and for the COP readout
+`cop_heating`, `cop_hot_water`, `cop_heating_24h`, `cop_hot_water_24h`.
 
 Notes
 
@@ -50,9 +51,16 @@ Notes
 * The heating circuit is drawn as underfloor heating. The card only follows the pump's flow
   setting if the entity "Flow setting climate system 1" (point 3976, disabled by default) is
   enabled; otherwise set `circuit.type`.
-* "COP (1 h)" is the heat produced divided by the energy used in the last full hour, from the
-  pump's own hourly energy log. It is an estimate and shows a dash when the pump used almost
-  nothing in that hour.
+* The COP readout shows the calculated COP of the integration (sensors *COP heating*, *COP hot water* and
+  their 24 h versions, from version 0.13.0 of the integration; the card finds them by themselves). While the
+  pump heats or charges hot water it shows the COP of that mode over the last 15 minutes, labelled "COP".
+  That value is unknown for the first minutes after a start, a defrost or a change of mode; the card then
+  shows the COP of the last 24 hours ("COP (24 h)"), and on standby the 24 h COP of heating, or of hot water
+  if there is none for heating. If nothing has been calculated yet (for example right after a restart) or the
+  integration is older, it shows "COP (1 h)": the heat produced divided by the energy used in the last full
+  hour, from the pump's own hourly energy log. That one is an estimate, includes standby and the
+  controller, and shows a dash when the pump used almost nothing in that hour. Hover (or tap) the value
+  to see which one it is; tapping opens the sensor. During cooling the calculated COP is not used.
 * "Start" and "Stop" below the tank are the hot water start and stop temperatures of the selected
   hot water demand (small, medium or large): the temperatures at which the pump starts and stops
   charging. With smart control the pump decides and the card shows a dash. The top temperature

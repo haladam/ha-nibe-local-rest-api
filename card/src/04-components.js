@@ -254,8 +254,21 @@ function drawHeatPump(scene, box, name) {
     y2,
     scene.t.cop,
     (plant, hass) => {
-      const cop = plant.cop();
-      return cop === null ? "–" : formatNumber(hass, cop, 1);
+      const reading = plant.copReading();
+      return reading === null ? "–" : formatNumber(hass, reading.value, 1);
+    },
+    {
+      slot: (plant) => (plant.copReading() || { slot: "cop_heating" }).slot,
+      label: (plant) => {
+        const reading = plant.copReading();
+        return !reading || reading.source === "log" ? scene.t.cop : reading.source === "24h" ? scene.t.cop24 : scene.t.copLive;
+      },
+      title: (plant) => {
+        const reading = plant.copReading();
+        if (!reading) return "";
+        const tip = scene.t.copTip[reading.source];
+        return reading.mode ? `${scene.t.modes[reading.mode]}: ${tip}` : tip;
+      },
     }
   );
   drawReadout(scene, group, colB, y2, scene.t.outside, tempReadout("outdoor"), { slot: "outdoor" });

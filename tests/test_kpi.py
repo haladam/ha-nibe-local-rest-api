@@ -328,6 +328,8 @@ a = ent[("heating", False)].extra_state_attributes
 check("sensors: attributes explain the number", a["status"] == "ok" and a["window_minutes"] == 15 and 9.5 <= a["counted_minutes"] <= 10.5
       and close(a["heat_kwh"] / a["electricity_kwh"], COP_STEADY, 0.02) and a["rejected_readings"] == 0, a)
 check("sensors: 24 h window attribute", ent[("heating", True)].extra_state_attributes["window_minutes"] == 1440)
+check("sensors: the card finds each one by its nibe_calc attribute", {k: e.extra_state_attributes["nibe_calc"] for k, e in ent.items()}
+      == {("heating", False): "cop_heating", ("heating", True): "cop_heating_24h", ("hot_water", False): "cop_hot_water", ("hot_water", True): "cop_hot_water_24h"})
 check("sensors: the 24 h value is ok, the hot water one says it is still collecting data",
       ent[("heating", True)].extra_state_attributes["status"] == "ok" and ent[("hot_water", True)].extra_state_attributes["status"] == "collecting data: 0.00 of 0.1 kWh of electricity"
       and ent[("heating", True)].extra_state_attributes["settling_seconds_left"] is None, (ent[("heating", True)].extra_state_attributes, ent[("hot_water", True)].extra_state_attributes))

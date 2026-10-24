@@ -166,7 +166,7 @@ class NibeCopSensor(CoordinatorEntity, SensorEntity):
     # these change on every update; they stay visible but are not written to the database
     _unrecorded_attributes = frozenset({
         "status", "settling_seconds_left", "counted_minutes", "heat_kwh", "electricity_kwh",
-        "rejected_readings", "window_minutes",
+        "rejected_readings", "window_minutes", "nibe_calc",
     })
 
     def __init__(self, coordinator, mode: str, long: bool) -> None:
@@ -174,6 +174,7 @@ class NibeCopSensor(CoordinatorEntity, SensorEntity):
         self._mode, self._long = mode, long
         suffix = "_24h" if long else ""
         self._attr_unique_id = f"{coordinator.serial}_cop_{mode}{suffix}"
+        self._nibe_calc = f"cop_{mode}{suffix}"  # what the card looks for (nibe-plant-card)
         self._attr_name = f"COP {_COP_LABEL[mode]}" + (" (24 h)" if long else "")
         self._attr_device_info = coordinator.device_info
 
@@ -199,6 +200,7 @@ class NibeCopSensor(CoordinatorEntity, SensorEntity):
         else:
             status = last.status if last else None
         return {
+            "nibe_calc": self._nibe_calc,
             "status": status,
             "settling_seconds_left": None if self._long or not last else round(last.settle_left_s),
             "window_minutes": round(self._window_s / 60),
