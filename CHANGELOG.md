@@ -4,6 +4,15 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.13.1 - 2026-10-24
+
+* "Brine pump dT current" and "Brine pump dT set point value" now have the unit K and the state class
+  measurement. They were plain numbers without a unit, so Home Assistant neither drew a graph nor kept
+  long-term statistics for them, and every change of the current value (about 360 a day) was listed in the
+  Activity feed. They are temperature differences, so the unit is kelvin and not a temperature device class
+  (that would convert the value as if it were a temperature). Entity ids are unchanged. These were the only
+  enabled sensors with a decimal value and no unit.
+
 ## 0.13.0 - 2026-10-24
 
 * The card's COP readout shows the calculated COP now. While the compressor heats or charges hot water it

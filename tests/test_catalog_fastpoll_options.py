@@ -90,6 +90,13 @@ if os.path.exists(REST):
     check("C real: 14312 and 14313 are switches", new(14312).kind == "switch" and new(14313).kind == "switch")
     check("C real: 32824 power limitation stays disabled", not new(32824).enabled)
     check("C real: 14314 description names the prerequisite", "7.5.12" in new(14314).description)
+    # brine pump delta T is a temperature difference: kelvin, not degrees (a temperature device class would convert it)
+    check("D real: brine pump dT (current and set point) are measurements in K, without a temperature device class",
+          all((new(p).unit, new(p).device_class, new(p).state_class, new(p).kind) == ("K", None, "measurement", "sensor") for p in (3294, 3295)),
+          [(new(p).unit, new(p).device_class, new(p).state_class) for p in (3294, 3295)])
+    check("D real: no other enabled sensor with a decimal divisor lacks a unit",
+          not [p for p, i in infos.items() if i.kind == "sensor" and i.enabled and not i.unit and not i.options and points[p]["metadata"].get("divisor", 1) > 1],
+          [p for p, i in infos.items() if i.kind == "sensor" and i.enabled and not i.unit and not i.options and points[p]["metadata"].get("divisor", 1) > 1])
 
     # CSV rows match the header
     rows = [pkg._csv_row(p, i, points[p]) for p, i in sorted(infos.items())]
