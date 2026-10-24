@@ -4,6 +4,23 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.12.2 - 2026-10-24
+
+* Fixes the calculated COP, heat output, energy totals and compressor starts staying Unknown on a real Home
+  Assistant (0.10.0 to 0.12.1). Only "COP pump counters (lifetime)" worked, because it reads the pump's own
+  counters. The cause was a name clash: this integration has a `time.py` (the platform for time-of-day
+  settings), and once Home Assistant had loaded it, the name `time` inside `__init__.py` pointed at that file
+  instead of Python's clock. The first update worked, every later one failed on `time.monotonic()` and
+  switched the calculation off ("COP calculation stopped after an unexpected error" in the log). The tests
+  used a stand-in clock, so they could not see it. A new test imports the platform and runs the updates with
+  the real clock, and another checks that `__init__.py` never imports a module whose name is also a file of
+  the package.
+* After updating, restart Home Assistant. The live COP shows a value about 10 minutes after the compressor
+  starts, the 24 h COP after about 35 minutes of running, and the season and lifetime COPs after about 75
+  minutes of running at minimum speed (0.25 kWh of electricity). Hot water COP follows the first hot water
+  run.
+* 0.12.0 and 0.12.1 have the same code as 0.11.1 apart from the version number.
+
 ## 0.12.1 - 2026-10-24
 
 * Brings the version numbers back in line: nothing in the code changed since 0.11.1. The GitHub release

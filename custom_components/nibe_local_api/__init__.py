@@ -4,10 +4,10 @@ import asyncio
 import csv
 import logging
 import os
-import time
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from typing import Any
+from time import monotonic  # never `import time` here: see tests/test_module_names.py
 from zoneinfo import ZoneInfo
 
 import voluptuous as vol
@@ -197,7 +197,7 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                 point = points.get(pid)
                 return scaled_value(pid, point) if point else None
 
-            now = time.monotonic()
+            now = monotonic()
             sample = build_sample(now, value)
             self.kpi.update(sample)
             self.totals.update(sample, self._today(), {k: value(pid) for k, pid in KPI_COUNTERS.items()})

@@ -260,7 +260,7 @@ class Api:
     async def get_notifications(self): return []
 
 clock = [5000.0]
-pkg.time = types.SimpleNamespace(monotonic=lambda: clock[0])
+pkg.monotonic = lambda: clock[0]
 pkg.dr = types.SimpleNamespace(async_get=lambda hass: types.SimpleNamespace(
     async_get_device=lambda identifiers=None, connections=None: None, async_update_device=lambda *a, **k: None))
 
