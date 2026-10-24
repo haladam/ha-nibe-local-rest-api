@@ -4,6 +4,7 @@ import asyncio
 import csv
 import logging
 import os
+import time
 from collections.abc import Callable, Iterable
 from datetime import timedelta
 from typing import Any
@@ -33,6 +34,7 @@ from .const import (
 )
 from .exceptions import translated_error
 from .fastpoll import is_point_payload, selected_point_ids
+from .kpi import CopTracker, Settings as KpiSettings, available as kpi_available, build_sample
 from .card import async_register_card
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +99,10 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         self.fast_points: list[int] = []
         self._fast_failures = 0
         self._sw_version: str | None = None
+        self._scan_interval = interval
+        # Calculated COP and heat output (kpi.py); created from the first table that has the points.
+        self.kpi: CopTracker | None = None
+        self._kpi_failed = False
         # point id -> callbacks of the entities that show it (see async_add_listener)
         self._point_callbacks: dict[int, set[CALLBACK_TYPE]] = {}
         self.device_info = DeviceInfo(
@@ -148,7 +154,28 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         async with self._poll_lock:
             points = await self._fetch_all()
         self._apply_sw_version(points)
+        self._update_kpi(points)
         return points
+
+    def _update_kpi(self, points: dict[int, dict]) -> None:
+        """Feed the COP tracker one reading per full table. Never allowed to break the update."""
+        if self._kpi_failed:
+            return
+        try:
+            if self.kpi is None:
+                if not kpi_available(points):
+                    return
+                # A reading older than ~2.5 update intervals is not part of the same run of data.
+                self.kpi = CopTracker(KpiSettings(max_gap_s=max(150.0, 2.5 * self._scan_interval)))
+
+            def value(pid: int) -> float | None:
+                point = points.get(pid)
+                return scaled_value(pid, point) if point else None
+
+            self.kpi.update(build_sample(time.monotonic(), value))
+        except Exception:  # noqa: BLE001 - a bug here must not take the regular sensors down
+            self._kpi_failed = True
+            _LOGGER.exception("COP calculation stopped after an unexpected error")
 
     def _apply_sw_version(self, points: dict[int, dict]) -> None:
         """Keep the device's software version in step with the pump (it changes on update)."""

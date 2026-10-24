@@ -11,6 +11,9 @@ ships an animated Lovelace overview card, `nibe-plant-card`.
   through the `nibe_local_api.set_aux` service (needs pump software 2.4.3 or later).
 * Optional **fast polling** of up to 10 chosen points (for example compressor frequency or
   additional heat steps) between the regular full-table reads.
+* Calculates the **COP of the compressor for heating and for hot water**, and the heat output, from the
+  pump's own flow, temperature and power readings, leaving out start-up, mode changes and spikes
+  (see [COP and heat output](#cop-and-heat-output-calculated)).
 * Writes `nibe_local_api_points.csv` into the Home Assistant config folder at start-up: every
   point with its entity name, unit, range and menu path, which is handy for finding things.
 * Bundles the **`nibe-plant-card`**, loaded by the integration itself (see [the card](#the-card)).
@@ -60,6 +63,57 @@ flow.
 *Update interval* (default 30 s) is how often the full points table (about 1 MB) is read.
 *Fast-polled points* and *Fast polling interval* (5 s or more) re-read a few chosen points
 with one small request each; leave the list empty to switch it off.
+
+## COP and heat output (calculated)
+
+If the pump reports the compressor state (or the "compressor running" flag), the operating priority, the
+compressor power input, the heating medium flow and the condenser and return line temperatures
+(points 2556 or 1973, 1758, 1801 or 1932, 58, 15 and 10), the integration adds five sensors:
+
+| Sensor | Shows |
+| --- | --- |
+| **COP heating**, **COP hot water** | COP of the last 15 minutes, only while the pump is producing in that mode and has settled. Unknown while it is idle, starting up or changing mode. |
+| **COP heating (24 h)**, **COP hot water (24 h)** | COP over everything that counted in the last 24 hours. It stays while the pump is idle. |
+| **Heat output (calculated)** | Heat the compressor delivers right now, in kW; 0 while the compressor is stopped. |
+
+Heat is the flow times 4.15 kJ/(L K) times the temperature rise across the condenser (supply line BT12
+minus return line BT3), and the COP is that heat divided by the compressor's power input. BT12 sits
+before the internal electric heater, so this is the compressor's own COP: additional heat is on neither
+side of the ratio. Every COP is energy over energy (heat summed over electricity summed), never an
+average of single readings.
+
+A reading is left out when:
+
+* the compressor is not running, or it started less than **5 minutes** ago (the heat at the condenser
+  lags the power while the circuits warm up). The same 5 minutes apply after a defrost and after a
+  change between heating and hot water;
+* the priority and the hot water reversing valve (QN10) disagree (the valve is moving), or the pump is
+  off, heating the pool or cooling;
+* something jumped since the previous reading, which is a transition and not a trend: compressor
+  frequency by more than 20 Hz, power by more than 40 % (and 300 W), flow by more than 30 %, or the
+  temperature rise by more than 3 K. The pump then has to be steady for **2 minutes** again;
+* the flow is under 2 L/min, the power under 250 W or the temperature rise outside 1 to 25 K;
+* the COP of that single reading is under 0.8 or over 9, which is a sensor spike and not a heat pump.
+  These are counted in the `rejected_readings` attribute.
+
+The attributes of the COP sensors say why there is, or is not, a number: `status` (`ok`, `idle`,
+`settling`, `unsteady`, `other operation`, `out of range`, `implausible`, `defrost` or `no data`), the
+seconds left of the waiting time, the minutes that counted in the window and the heat and electricity in
+kWh behind the value.
+
+Things to know:
+
+* The tracker is fed once per full table (every 30 s by default), so a short run gives no number. The
+  15-minute value appears after 2 minutes of counted data, the 24 h value after 0.2 kWh of electricity.
+* The readings are kept in memory only, so the 24 h values start empty after a restart of Home Assistant.
+* The temperature rise is small (often 4 to 8 K) and measured by two sensors, so a 0.5 K error is
+  already 6 to 12 % of the heat. Read the figures as good for comparing modes, days and settings, not as a
+  laboratory COP.
+* For kWh of heat, add an *Integral* helper (right Riemann sum, kW, time unit hours) on *Heat output
+  (calculated)*. The pump's own heat counters (heating and hot water, compressor only) are also available
+  as sensors for comparison.
+* Not yet confirmed on a running pump: that point 1801 is the best power reading (1932 is the average),
+  and the waiting times. Reports are welcome.
 
 ## The card
 

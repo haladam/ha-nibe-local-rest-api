@@ -10,6 +10,7 @@ from .api import (
 )
 from .const import HEATER_MAX_POINT, HEATER_STEP_KW, HEATER_STEPS_POINT, VERSION_POINT
 from .entity import NibePointEntity, enable_live_entities
+from .kpi import HEATING, HOT_WATER
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -30,6 +31,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     extra = [NibeAlarmSensor(coordinator)]
     if HEATER_STEPS_POINT in coordinator.data:
         extra += [NibeHeaterPowerSensor(coordinator), NibeHeaterLoadSensor(coordinator)]
+    if coordinator.kpi is not None:  # the pump reports what the COP calculation needs
+        extra += [
+            NibeCopSensor(coordinator, HEATING, long=False),
+            NibeCopSensor(coordinator, HOT_WATER, long=False),
+            NibeCopSensor(coordinator, HEATING, long=True),
+            NibeCopSensor(coordinator, HOT_WATER, long=True),
+            NibeHeatOutputSensor(coordinator),
+        ]
     async_add_entities([*extra, *entities])
 
 
@@ -119,6 +128,88 @@ class NibeHeaterLoadSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         steps, max_kw = _heater_values(self.coordinator)
         return {"steps": steps, "max_kw": max_kw, "max_steps": heater_max_steps(max_kw)}
+
+
+_COP_LABEL = {HEATING: "heating", HOT_WATER: "hot water"}
+
+
+class NibeCopSensor(CoordinatorEntity, SensorEntity):
+    """COP of the compressor for heating or hot water, from kpi.CopTracker.
+
+    The short one covers the last 15 minutes and is only shown while the pump is producing
+    in that mode and has settled (unknown otherwise). The 24 h one is the energy-weighted COP
+    of everything that counted in the last day and stays while the pump is idle.
+    """
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:heat-pump"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+    # these change on every update; they stay visible but are not written to the database
+    _unrecorded_attributes = frozenset({
+        "status", "settling_seconds_left", "counted_minutes", "heat_kwh", "electricity_kwh",
+        "rejected_readings", "window_minutes",
+    })
+
+    def __init__(self, coordinator, mode: str, long: bool) -> None:
+        super().__init__(coordinator)
+        self._mode, self._long = mode, long
+        suffix = "_24h" if long else ""
+        self._attr_unique_id = f"{coordinator.serial}_cop_{mode}{suffix}"
+        self._attr_name = f"COP {_COP_LABEL[mode]}" + (" (24 h)" if long else "")
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def _window_s(self) -> float:
+        cfg = self.coordinator.kpi.cfg
+        return cfg.long_window_s if self._long else cfg.live_window_s
+
+    @property
+    def native_value(self):
+        tracker = self.coordinator.kpi
+        return tracker.long_cop(self._mode) if self._long else tracker.live_cop(self._mode)
+
+    @property
+    def extra_state_attributes(self):
+        tracker = self.coordinator.kpi
+        valid, heat, power = tracker.window(self._mode, self._window_s)
+        last = tracker.last
+        return {
+            "status": last.status if last else None,
+            "settling_seconds_left": round(last.settle_left_s) if last else None,
+            "window_minutes": round(self._window_s / 60),
+            "counted_minutes": round(valid / 60, 1),
+            "heat_kwh": round(heat, 3),
+            "electricity_kwh": round(power, 3),
+            "rejected_readings": tracker.rejected[self._mode],
+        }
+
+
+class NibeHeatOutputSensor(CoordinatorEntity, SensorEntity):
+    """Heat the compressor delivers right now: flow x temperature rise across the condenser."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Heat output (calculated)"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = "kW"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+    _unrecorded_attributes = frozenset({"status"})
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.serial}_heat_output_calc"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def native_value(self):
+        last = self.coordinator.kpi.last
+        return None if last is None or last.heat_kw is None else round(last.heat_kw, 3)
+
+    @property
+    def extra_state_attributes(self):
+        last = self.coordinator.kpi.last
+        return {"status": last.status if last else None}
 
 
 class NibeSensor(NibePointEntity, SensorEntity):

@@ -4,6 +4,28 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.10.0 - 2026-10-24
+
+* New calculated sensors, created when the pump reports the points they need (compressor state or running
+  flag, operating priority, compressor power input, heating medium flow, condenser and return line
+  temperatures):
+  * **COP heating** and **COP hot water**: COP of the last 15 minutes, only while the pump is producing in
+    that mode and has settled (unknown otherwise);
+  * **COP heating (24 h)** and **COP hot water (24 h)**: energy-weighted COP of everything that counted in
+    the last 24 hours;
+  * **Heat output (calculated)**: flow times the temperature rise across the condenser, in kW (0 while the
+    compressor is stopped).
+* Heating and hot water are separated by the operating priority together with the reversing valve (QN10).
+  Readings are left out while the compressor is stopped or less than 5 minutes into a run, a defrost or a
+  mode change, while priority and valve disagree, after a sudden step in frequency, power, flow or
+  temperature difference (2 minutes), when flow, power or temperature rise are out of range, and when a
+  single reading's COP is under 0.8 or over 9 (counted in `rejected_readings`). Details are in the README.
+* The COP is always summed heat over summed electricity, never an average of single readings. The sensors
+  explain themselves through a `status` attribute.
+* The calculation cannot disturb the other sensors: an unexpected error in it is logged once and only
+  switches the COP sensors off.
+* Not yet checked on a running pump (the available logs contain no numeric readings of a run).
+
 ## 0.9.16 - 2026-10-22
 
 * Undoes the 0.9.15 change to "More hot water, minutes remaining" (point 4030): the pump's REST interface

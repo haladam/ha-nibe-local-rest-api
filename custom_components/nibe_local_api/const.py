@@ -42,6 +42,21 @@ HEATER_STEPS_POINT = 1760
 HEATER_MAX_POINT = 3823
 HEATER_STEP_KW = 0.5
 
+# Points the calculated COP and heat output are built from (see kpi.py)
+KPI_POINTS = {
+    "priority": 1758,    # 20 hot water, 30 heating
+    "valve": 2002,       # reversing valve QN10, 1 = hot water
+    "state": 2556,       # compressor state, 60 = running
+    "running": 1973,     # "compressor running" flag, used when the state point is missing
+    "freq": 1799,        # compressor frequency
+    "power": 1801,       # compressor power input
+    "power_avg": 1932,   # same, averaged: used when the instantaneous point is missing
+    "flow": 58,          # heating medium flow (BF1)
+    "supply": 15,        # condenser supply line (BT12)
+    "return": 10,        # return line (BT3)
+    "defrost": 3126,
+}
+
 # Derived "running" sensors: key -> (speed point, name)
 PUMP_POINTS = {
     "gp1": (1975, "Heating medium pump running (GP1)"),
