@@ -125,9 +125,9 @@ a = rr.feed(**{**STEADY, "power_w": 2300, "frequency_hz": 66})
 check("a slow change (15 % power, 6 Hz) is a trend, not a step", a.status == "ok", a)
 
 # a reading that is steady but physically implausible
-bad = dict(STEADY, supply_c=50)                            # 20 K at 20 L/min on 2 kW = COP 13.8
+bad = dict(STEADY, supply_c=50, power_w=1500)              # 20 K at 20 L/min on 1.5 kW = COP 18.5
 rr = Run(); r = rr.hold(600, **bad)
-check("implausible COP (13.8): rejected and counted as such", r.status == "implausible" and r.cop is None and rr.tr.rejected["heating"] > 0, (r, rr.tr.rejected))
+check("implausible COP (18.5): rejected and counted as such", r.status == "implausible" and r.cop is None and rr.tr.rejected["heating"] > 0, (r, rr.tr.rejected))
 check("implausible readings do not give a COP", rr.tr.long_cop("heating") is None and rr.tr.live_cop("heating") is None)
 rr = Run(); r = rr.hold(600, **dict(STEADY, supply_c=30.5, flow_lpm=4))
 check("COP below 0.8 is rejected as well (rise 0.5 K is also below the sensor accuracy)", r.status == "out of range", r)
@@ -135,10 +135,19 @@ rr = Run(); r = rr.hold(600, **dict(STEADY, supply_c=31.5, flow_lpm=5, power_w=2
 check("a temperature rise of 1.5 K and a COP of 0.17: rejected as implausible", r.status == "implausible", r)
 
 for label, fields in {
-        "power below the minimum": dict(power_w=200), "flow below the minimum": dict(flow_lpm=1.5),
+        "power below the minimum": dict(power_w=80), "flow below the minimum": dict(flow_lpm=1.5),
         "temperature rise below 1 K": dict(supply_c=30.6), "temperature rise above 25 K": dict(supply_c=58)}.items():
     rr = Run(); r = rr.hold(600, **{**STEADY, **fields})
     check(f"{label}: out of range, not counted", r.status == "out of range" and r.cop is None, r)
+
+# a real reading from an S1155 at minimum speed (export of 2026-10-24): 24 Hz, 206 W, 15.1 L/min, 26.1 / 24.0 degC.
+# The pump's own hourly log for that hour says 2.27 kWh produced for 0.24 kWh used (9.5); 0.10.0 dropped it.
+REAL = dict(priority=30, valve_hot_water=0, compressor_state=60, compressor_on=1, frequency_hz=24, power_w=206,
+            flow_lpm=15.1, supply_c=26.1, return_c=24.0, defrost=0)
+rr = Run(); r = rr.hold(900, **REAL)
+real_cop = 15.1 / 60 * 4.15 * 2.1 * 1000 / 206
+check("real low-load reading (206 W, 2.1 K rise) counts, COP about 10.6", r.status == "ok" and close(r.cop, real_cop, 1e-6) and 10.5 < r.cop < 10.7, r)
+check("... and shows as live COP", close(rr.tr.live_cop("heating"), real_cop, 1e-6), rr.tr.live_cop("heating"))
 
 # ------------------------------------------------------------------ defrost, missing data, gaps
 rr = Run(); rr.hold(600, **STEADY)

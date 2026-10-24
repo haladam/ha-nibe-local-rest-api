@@ -4,6 +4,16 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.10.1 - 2026-10-24
+
+* COP: two limits from 0.10.0 were too tight for real operation. A reading from an S1155 at minimum speed
+  (24 Hz, 206 W, 15.1 L/min, 26.1 / 24.0 degC, which is a COP of about 10.6 and agrees with the pump's own hourly
+  log of 2.27 kWh produced for 0.24 kWh used) was dropped as "out of range". The minimum power is now 100 W
+  (was 250 W) and a single reading counts up to a COP of 15 (was 9). Without this the heating COP stayed
+  unknown at low load, which is most of the mild season.
+* README: says that the calculated COP uses the compressor's power input only, so it reads higher than a COP
+  built on the pump's hourly energy log (which includes standby).
+
 ## 0.10.0 - 2026-10-24
 
 * New calculated sensors, created when the pump reports the points they need (compressor state or running

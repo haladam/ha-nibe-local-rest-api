@@ -50,13 +50,13 @@ class Settings:
     min_power_step_w: float = 300.0  # ... and at least this many watts
     max_flow_step: float = 0.3       # relative change of the flow
     max_delta_t_step: float = 3.0    # K between two readings
-    min_power_w: float = 250.0       # below this the compressor is not really producing
+    min_power_w: float = 100.0       # below this the compressor is not really producing (minimum speed draws ~200 W)
     min_flow_lpm: float = 2.0
     max_flow_lpm: float = 60.0
     min_delta_t: float = 1.0         # K across the condenser: smaller is within the sensor error
     max_delta_t: float = 25.0
     min_cop: float = 0.8             # a single reading outside this is a sensor spike
-    max_cop: float = 9.0
+    max_cop: float = 15.0            # above the Carnot limit of any ground source pump here
     max_gap_s: float = 150.0         # a longer pause between two readings is not integrated
     live_window_s: float = 900.0
     min_live_valid_s: float = 120.0  # counted seconds in the live window before a value is shown

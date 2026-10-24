@@ -92,8 +92,9 @@ A reading is left out when:
 * something jumped since the previous reading, which is a transition and not a trend: compressor
   frequency by more than 20 Hz, power by more than 40 % (and 300 W), flow by more than 30 %, or the
   temperature rise by more than 3 K. The pump then has to be steady for **2 minutes** again;
-* the flow is under 2 L/min, the power under 250 W or the temperature rise outside 1 to 25 K;
-* the COP of that single reading is under 0.8 or over 9, which is a sensor spike and not a heat pump.
+* the flow is under 2 L/min, the power under 100 W or the temperature rise outside 1 to 25 K;
+* the COP of that single reading is under 0.8 or over 15, which is a sensor spike and not a heat pump
+  (a reading from an S1155 at minimum speed on low-temperature underfloor heating came to about 10).
   These are counted in the `rejected_readings` attribute.
 
 The attributes of the COP sensors say why there is, or is not, a number: `status` (`ok`, `idle`,
@@ -106,7 +107,9 @@ Things to know:
 * The tracker is fed once per full table (every 30 s by default), so a short run gives no number. The
   15-minute value appears after 2 minutes of counted data, the 24 h value after 0.2 kWh of electricity.
 * The readings are kept in memory only, so the 24 h values start empty after a restart of Home Assistant.
-* The temperature rise is small (often 4 to 8 K) and measured by two sensors, so a 0.5 K error is
+* The compressor's power input is the only electricity in the ratio, so the COP reads higher than one built
+  on the pump's own hourly energy log, which also counts standby (about 36 W) and the controller.
+* The temperature rise is small (2 to 8 K) and measured by two sensors, so a 0.5 K error is
   already 6 to 12 % of the heat. Read the figures as good for comparing modes, days and settings, not as a
   laboratory COP.
 * For kWh of heat, add an *Integral* helper (right Riemann sum, kW, time unit hours) on *Heat output
