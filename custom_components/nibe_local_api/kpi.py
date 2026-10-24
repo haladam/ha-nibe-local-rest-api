@@ -125,7 +125,7 @@ class CopTracker:
         heat_kw = 0.0 if running is False else (q_kw if running else None)
         self._prev = (s.frequency_hz, s.power_w, s.flow_lpm, delta_t)
 
-        mode = self._mode(s)
+        mode = operating_mode(s)
         status: str | None = None
         key: str | None = None
         if running is None:
@@ -229,16 +229,17 @@ class CopTracker:
             running = False
         return running
 
-    @staticmethod
-    def _mode(s: Sample) -> str | None:
-        if s.priority is None:
-            return None
-        valve = None if s.valve_hot_water is None else s.valve_hot_water >= 0.5
-        if s.priority == PRIORITY_HOT_WATER and valve is not False:
-            return HOT_WATER
-        if s.priority == PRIORITY_HEATING and valve is not True:
-            return HEATING
+
+def operating_mode(s: Sample) -> str | None:
+    """heating or hot water when the priority and the reversing valve agree, otherwise None."""
+    if s.priority is None:
         return None
+    valve = None if s.valve_hot_water is None else s.valve_hot_water >= 0.5
+    if s.priority == PRIORITY_HOT_WATER and valve is not False:
+        return HOT_WATER
+    if s.priority == PRIORITY_HEATING and valve is not True:
+        return HEATING
+    return None
 
 
 def available(points: dict) -> bool:

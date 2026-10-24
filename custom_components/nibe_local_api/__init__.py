@@ -6,13 +6,16 @@ import logging
 import os
 import time
 from collections.abc import Callable, Iterable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import voluptuous as vol
 from aiohttp import BasicAuth
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, Platform
+from homeassistant.const import (
+    CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, EVENT_HOMEASSISTANT_STOP, Platform,
+)
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
@@ -20,6 +23,7 @@ from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
@@ -29,12 +33,14 @@ from .api import (
 from .aux import AUX_FUNCTIONS, async_set_aux
 from .catalog import build_infos, load_data
 from .const import (
-    CONF_FAST_INTERVAL, CONF_HTTPS, CONF_SCAN_INTERVAL, DEFAULT_FAST_INTERVAL,
-    DEFAULT_SCAN_INTERVAL, DOMAIN, FAST_POLL_TIMEOUT, MAX_FAST_INTERVAL, MIN_FAST_INTERVAL,
+    CONF_FAST_INTERVAL, CONF_HTTPS, CONF_SCAN_INTERVAL, CONF_SEASON_START, DEFAULT_FAST_INTERVAL,
+    DEFAULT_SCAN_INTERVAL, DEFAULT_SEASON_START, DOMAIN, FAST_POLL_TIMEOUT, KPI_COUNTERS,
+    KPI_SAVE_INTERVAL, KPI_STORE_VERSION, MAX_FAST_INTERVAL, MIN_FAST_INTERVAL,
 )
 from .exceptions import translated_error
 from .fastpoll import is_point_payload, selected_point_ids
 from .kpi import CopTracker, Settings as KpiSettings, available as kpi_available, build_sample
+from .kpi_totals import EnergyTotals, TotalsSettings
 from .card import async_register_card
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,6 +109,12 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         # Calculated COP and heat output (kpi.py); created from the first table that has the points.
         self.kpi: CopTracker | None = None
         self._kpi_failed = False
+        # Running totals per mode for seasonal and lifetime COP (kpi_totals.py), saved between runs.
+        self.totals: EnergyTotals | None = None
+        self._store: Store | None = None
+        self._next_save = 0.0
+        self._season_month = _season_month(entry.options)
+        self._today: Callable[[], str] = self._local_day
         # point id -> callbacks of the entities that show it (see async_add_listener)
         self._point_callbacks: dict[int, set[CALLBACK_TYPE]] = {}
         self.device_info = DeviceInfo(
@@ -154,11 +166,22 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         async with self._poll_lock:
             points = await self._fetch_all()
         self._apply_sw_version(points)
-        self._update_kpi(points)
+        await self._async_update_kpi(points)
         return points
 
-    def _update_kpi(self, points: dict[int, dict]) -> None:
-        """Feed the COP tracker one reading per full table. Never allowed to break the update."""
+    def _local_day(self) -> str:
+        """Today's date in Home Assistant's time zone (ISO format)."""
+        try:
+            zone = ZoneInfo(self.hass.config.time_zone)
+        except Exception:  # noqa: BLE001 - unknown zone: fall back to the system's
+            zone = None
+        return datetime.now(zone).date().isoformat()
+
+    async def _async_update_kpi(self, points: dict[int, dict]) -> None:
+        """Feed the COP tracker and the running totals one reading per full table.
+
+        Never allowed to break the update: an unexpected error switches the calculation off.
+        """
         if self._kpi_failed:
             return
         try:
@@ -166,16 +189,50 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
                 if not kpi_available(points):
                     return
                 # A reading older than ~2.5 update intervals is not part of the same run of data.
-                self.kpi = CopTracker(KpiSettings(max_gap_s=max(150.0, 2.5 * self._scan_interval)))
+                gap = max(150.0, 2.5 * self._scan_interval)
+                self.totals = await self._async_load_totals(gap)
+                self.kpi = CopTracker(KpiSettings(max_gap_s=gap))
 
             def value(pid: int) -> float | None:
                 point = points.get(pid)
                 return scaled_value(pid, point) if point else None
 
-            self.kpi.update(build_sample(time.monotonic(), value))
+            now = time.monotonic()
+            sample = build_sample(now, value)
+            self.kpi.update(sample)
+            self.totals.update(sample, self._today(), {k: value(pid) for k, pid in KPI_COUNTERS.items()})
+            self._schedule_save(now)
         except Exception:  # noqa: BLE001 - a bug here must not take the regular sensors down
             self._kpi_failed = True
             _LOGGER.exception("COP calculation stopped after an unexpected error")
+
+    async def _async_load_totals(self, max_gap: float) -> EnergyTotals:
+        self._store = Store(self.hass, KPI_STORE_VERSION, f"{DOMAIN}.{self.serial}.kpi")
+        try:
+            saved = await self._store.async_load()
+        except Exception:  # noqa: BLE001 - damaged file: start counting again
+            _LOGGER.warning("Could not read the saved COP totals, starting again", exc_info=True)
+            saved = None
+        return EnergyTotals.from_dict(saved, TotalsSettings(max_gap_s=max_gap), self._season_month)
+
+    def _totals_data(self) -> dict:
+        return self.totals.to_dict()
+
+    def _schedule_save(self, now: float) -> None:
+        """Ask for a save every few minutes (Store waits a little and writes the latest data)."""
+        if self._store is None or now < self._next_save:
+            return
+        self._next_save = now + KPI_SAVE_INTERVAL
+        self._store.async_delay_save(self._totals_data, 30)
+
+    async def async_save_totals(self, *_: Any) -> None:
+        """Write the running totals now (unloading the entry, stopping Home Assistant)."""
+        if self._store is None or self.totals is None or self._kpi_failed:
+            return
+        try:
+            await self._store.async_save(self.totals.to_dict())
+        except Exception:  # noqa: BLE001 - losing a few minutes of totals is not worth an error
+            _LOGGER.warning("Could not save the COP totals", exc_info=True)
 
     def _apply_sw_version(self, points: dict[int, dict]) -> None:
         """Keep the device's software version in step with the pump (it changes on update)."""
@@ -267,6 +324,15 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
             await self.async_request_refresh()
 
 
+def _season_month(options) -> int:
+    """The month the season starts in (1-12), from the options."""
+    try:
+        month = int(options.get(CONF_SEASON_START, DEFAULT_SEASON_START))
+    except (TypeError, ValueError):
+        return DEFAULT_SEASON_START
+    return month if 1 <= month <= 12 else DEFAULT_SEASON_START
+
+
 def _loaded_coordinators(hass: HomeAssistant) -> list:
     return [
         e.runtime_data for e in hass.config_entries.async_entries(DOMAIN)
@@ -337,6 +403,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     entry.runtime_data = coordinator
+    entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, coordinator.async_save_totals))
     entry.async_on_unload(entry.add_update_listener(_reload))
     _register_services(hass)
     await async_register_card(hass)
@@ -351,6 +418,9 @@ async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    save = getattr(getattr(entry, "runtime_data", None), "async_save_totals", None)
+    if callable(save):
+        await save()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded and not any(
         e.entry_id != entry.entry_id and e.state is ConfigEntryState.LOADED

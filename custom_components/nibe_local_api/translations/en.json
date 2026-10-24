@@ -49,11 +49,13 @@
         "description": "The whole points table (about 1 MB) is read at the update interval. Points chosen under fast polling are additionally re-read on their own, one small request each, which is useful for values that move quickly, for example compressor frequency, additional heat steps or power.",
         "data": {
           "scan_interval": "Update interval (seconds)",
+          "season_start_month": "Season starts in month (1-12)",
           "fast_points": "Fast-polled points (at most 10)",
           "fast_interval": "Fast polling interval (seconds)"
         },
         "data_description": {
           "scan_interval": "How often the full points table is read.",
+          "season_start_month": "The seasonal COP sensors count from the 1st of this month (10 = October). Changing it restarts the season figures taken from the pump's own counters.",
           "fast_points": "Leave empty to switch fast polling off. Only points that have an enabled entity are listed.",
           "fast_interval": "Each round sends one request per chosen point. Keep it at 5 seconds or more; the heat pump's API is slow."
         }

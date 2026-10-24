@@ -56,6 +56,17 @@ class ConfigEntryState:
 class EntityCategory:
     DIAGNOSTIC = "diagnostic"; CONFIG = "config"
 
+class Store:
+    """In-memory stand-in for homeassistant.helpers.storage.Store (shared by key, like the .storage folder)."""
+    files: dict = {}
+    def __init__(self, hass, version, key): self.hass, self.version, self.key = hass, version, key; self.delayed = []
+    async def async_load(self): return Store.files.get(self.key)
+    async def async_save(self, data): Store.files[self.key] = data
+    def async_delay_save(self, data_func, delay=0): self.delayed.append((data_func, delay))
+    def run_delayed(self):
+        """What the timer (or the final write at shutdown) would do: save the latest data."""
+        if self.delayed: Store.files[self.key] = self.delayed[-1][0]()
+
 class _Any(types.ModuleType):
     def __getattr__(self, n):
         if n.startswith("__"): raise AttributeError(n)
@@ -68,7 +79,8 @@ def install():
     mod("homeassistant.exceptions", HomeAssistantError=HomeAssistantError,
         ConfigEntryAuthFailed=ConfigEntryAuthFailed, ConfigEntryNotReady=ConfigEntryNotReady)
     mod("homeassistant.const", EntityCategory=EntityCategory, CONF_HOST="host", CONF_PASSWORD="password",
-        CONF_PORT="port", CONF_USERNAME="username", Platform=MagicMock())
+        CONF_PORT="port", CONF_USERNAME="username", Platform=MagicMock(),
+        EVENT_HOMEASSISTANT_STOP="homeassistant_stop")
     mod("homeassistant.config_entries", ConfigEntry=object, ConfigEntryState=ConfigEntryState)
     mod("homeassistant.core", HomeAssistant=object, ServiceCall=object, callback=lambda f: f, CALLBACK_TYPE=object)
     mod("homeassistant.helpers.update_coordinator", DataUpdateCoordinator=DataUpdateCoordinator,
@@ -80,6 +92,7 @@ def install():
               "homeassistant.helpers.selector"]:
         sys.modules[n] = _Any(n)
     sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict  # a TypedDict in HA
+    mod("homeassistant.helpers.storage", Store=Store)
     sys.modules["voluptuous"] = _Any("voluptuous")
     pkg = types.ModuleType("nibe_local_api"); pkg.__path__ = [SRC]
     sys.modules["nibe_local_api"] = pkg

@@ -324,14 +324,17 @@ def flow(options, loaded=True):
 field = lambda form, name: next(m for m in form["schema"] if m.schema == name)
 form = asyncio.run(flow({"scan_interval": 45, "fast_points": [8], "fast_interval": 7}).async_step_init())
 sel_cfg = form["schema"][field(form, "fast_points")][1]
-check("options flow: form lists scan interval, fast points and fast interval",
-      [m.schema for m in form["schema"]] == ["scan_interval", "fast_points", "fast_interval"] and form["errors"] == {})
+check("options flow: form lists scan interval, season start, fast points and fast interval",
+      [m.schema for m in form["schema"]] == ["scan_interval", "season_start_month", "fast_points", "fast_interval"] and form["errors"] == {})
 check("options flow: only points with an enabled entity are offered, buttons and derived entities left out",
       [o["value"] for o in sel_cfg["options"]] == ["4", "8"] and sel_cfg["multiple"] is True and sel_cfg["options"][0]["label"] == "Outdoor [4]", sel_cfg["options"])
 check("options flow: saved choice and intervals are the defaults",
       field(form, "fast_points").default == ["8"] and field(form, "fast_interval").default == 7 and field(form, "scan_interval").default == 45)
 form = asyncio.run(flow({}).async_step_init())
 check("options flow: defaults without saved options", field(form, "fast_points").default == [] and field(form, "fast_interval").default == 10 and field(form, "scan_interval").default == 30)
+check("options flow: the season starts in October unless chosen otherwise", field(form, "season_start_month").default == 10)
+check("options flow: a saved season start is the default",
+      field(asyncio.run(flow({"season_start_month": 9}).async_step_init()), "season_start_month").default == 9)
 
 res = asyncio.run(flow({"other": 1, "fast_points": [8]}).async_step_init({"scan_interval": 60, "fast_points": ["4", "8"], "fast_interval": 12}))
 check("options flow: saved with point ids as integers, other options kept",
@@ -351,7 +354,7 @@ res = asyncio.run(many_flow({}).async_step_init({"scan_interval": 60, "fast_poin
 check("options flow: exactly 10 points is accepted", res["type"] == "create_entry" and res["data"]["fast_points"] == [int(v) for v in typed[:10]])
 reg_entries[:] = [Ent("S_4"), Ent("S_8"), Ent("S_10", disabled="user"), Ent("S_smartmode"), Ent("OTHER_4")]
 res = asyncio.run(flow({"scan_interval": 45, "fast_points": [8], "fast_interval": 7}, loaded=False).async_step_init())
-check("options flow: entry not loaded -> only the update interval is offered", [m.schema for m in res["schema"]] == ["scan_interval"])
+check("options flow: entry not loaded -> only the update interval and the season start are offered", [m.schema for m in res["schema"]] == ["scan_interval", "season_start_month"])
 res = asyncio.run(flow({"scan_interval": 45, "fast_points": [8], "fast_interval": 7}, loaded=False).async_step_init({"scan_interval": 90}))
 check("options flow: entry not loaded -> saving keeps the fast-polling choice",
       res["data"] == {"scan_interval": 90, "fast_points": [8], "fast_interval": 7}, res)
@@ -370,7 +373,8 @@ check("options flow: stale or unusable saved ids are not offered as defaults (th
 tr = json.load(open(SRC + "/translations/en.json", encoding="utf-8"))
 step = tr["options"]["step"]["init"]
 check("translations: every options field has a label and a description",
-      {"scan_interval", "fast_points", "fast_interval"} <= set(step["data"]) and {"scan_interval", "fast_points", "fast_interval"} <= set(step["data_description"]))
+      {"scan_interval", "season_start_month", "fast_points", "fast_interval"} <= set(step["data"])
+      and {"scan_interval", "season_start_month", "fast_points", "fast_interval"} <= set(step["data_description"]))
 check("translations: error key used by the flow exists", "too_many_points" in tr["options"]["error"])
 check("translations: config steps from 0.8.2 still there", {"user", "reauth_confirm", "reconfigure"} <= set(tr["config"]["step"]))
 check("manifest: version is 0.8.3 or later", version_at_least(json.load(open(SRC + "/manifest.json"))["version"], "0.8.3"))

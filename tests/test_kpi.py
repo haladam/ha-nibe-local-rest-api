@@ -269,7 +269,8 @@ class Cap(logging.Handler):
     def emit(self, r): self.recs.append(r)
 cap = Cap(); lg = logging.getLogger("nibe_local_api"); lg.addHandler(cap); lg.setLevel(logging.DEBUG)
 
-def mk(api, options=None):
+def mk(api, options=None, keep_files=False):
+    if not keep_files: harness.Store.files.clear()      # a fresh .storage folder unless the test is about a restart
     return pkg.NibeCoordinator("HASS", types.SimpleNamespace(options=options or {}), api, {"serial": "S", "name": "N", "manufacturer": "NIBE", "firmware": ""})
 def poll(c, seconds=30):
     clock[0] += seconds

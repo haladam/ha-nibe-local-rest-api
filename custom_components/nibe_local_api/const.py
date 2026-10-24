@@ -57,6 +57,19 @@ KPI_POINTS = {
     "defrost": 3126,
 }
 
+# Counters of the pump itself that the running totals are checked against (see kpi_totals.py)
+KPI_COUNTERS = {
+    "starts": 2561,        # compressor number of starts (EB100-EP14)
+    "heating": 27378,      # heat produced, heating, compressor only (kWh)
+    "hot_water": 27379,    # heat produced, hot water, compressor only (kWh)
+    "total_heat": 28392,   # lifetime heat produced (kWh)
+    "total_el": 28393,     # lifetime electricity consumption, estimated by the pump (kWh)
+}
+CONF_SEASON_START = "season_start_month"
+DEFAULT_SEASON_START = 10   # the season counts from the 1st of this month
+KPI_STORE_VERSION = 1
+KPI_SAVE_INTERVAL = 300     # seconds between saves of the running totals
+
 # Derived "running" sensors: key -> (speed point, name)
 PUMP_POINTS = {
     "gp1": (1975, "Heating medium pump running (GP1)"),

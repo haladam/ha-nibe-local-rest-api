@@ -4,6 +4,26 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.11.0 - 2026-10-24
+
+* **Seasonal and lifetime COP**, separately for heating, hot water and total: *COP heating (season)*,
+  *COP hot water (season)*, *COP total (season)* and the same *(lifetime)*. They count everything the
+  compressor did (start-ups and mode changes included), so they are what a yearly performance factor
+  looks like. The season starts on the 1st of a month chosen under Configure (*Season starts in month*,
+  default October); `previous_season_cop` shows the last one.
+* **COP pump counters (season / lifetime)**: the pump's own *Tot. production* over *Tot. consumption*
+  (the lifetime figure covers the whole life of the pump; the pump's consumption is an estimate).
+* **The missing energy totals**: *Compressor electricity, heating / hot water (calculated)* and *Heat
+  produced, heating / hot water (calculated)*, summed from the compressor's power and the heat flow, as
+  `total_increasing` kWh sensors for the Energy dashboard and long-term statistics. The heat sensors
+  compare themselves with the pump's own heat counters (`calculated_vs_pump`).
+* **Compressor starts today** and **Compressor run time per start (today)**, from the pump's start
+  counter and the compressor's running time.
+* The running totals are kept per day, saved every five minutes and when Home Assistant stops
+  (`.storage/nibe_local_api.<serial>.kpi`) and restored at start-up. Time in which the pump could not be
+  read counts for neither heat nor electricity (see `coverage`).
+* New option: *Season starts in month*.
+
 ## 0.10.1 - 2026-10-24
 
 * COP: two limits from 0.10.0 were too tight for real operation. A reading from an S1155 at minimum speed

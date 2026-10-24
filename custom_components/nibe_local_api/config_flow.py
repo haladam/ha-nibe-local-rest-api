@@ -16,8 +16,8 @@ from homeassistant.helpers.selector import (
 
 from .api import NibeApiError, NibeAuthError, NibeLocalApi, parse_device
 from .const import (
-    CONF_FAST_INTERVAL, CONF_FAST_POINTS, CONF_HTTPS, CONF_SCAN_INTERVAL,
-    DEFAULT_FAST_INTERVAL, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DOMAIN,
+    CONF_FAST_INTERVAL, CONF_FAST_POINTS, CONF_HTTPS, CONF_SCAN_INTERVAL, CONF_SEASON_START,
+    DEFAULT_FAST_INTERVAL, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, DEFAULT_SEASON_START, DOMAIN,
     MAX_FAST_INTERVAL, MAX_FAST_POINTS, MIN_FAST_INTERVAL,
 )
 from .fastpoll import choice_pairs, selected_point_ids
@@ -184,6 +184,10 @@ class NibeOptionsFlow(config_entries.OptionsFlow):
                 CONF_SCAN_INTERVAL,
                 default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             ): vol.All(int, vol.Range(min=15, max=3600)),
+            vol.Required(
+                CONF_SEASON_START,
+                default=current.get(CONF_SEASON_START, DEFAULT_SEASON_START),
+            ): vol.All(int, vol.Range(min=1, max=12)),
         }
         if choices:
             # The selector rejects a default that is not among its options.
