@@ -173,7 +173,7 @@ class Plant {
       const st = this.stateObj(slot);
       parts.push(st ? `${st.state}|${st.attributes && st.attributes.raw_value}` : "-");
     }
-    for (const key of ["power", "battery", "grid"]) {
+    for (const key of ["power", "battery", "grid", "grid_import", "battery_discharge"]) {
       const st = this.pvState(key);
       parts.push(st ? st.state : "-");
     }

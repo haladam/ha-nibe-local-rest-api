@@ -4,6 +4,16 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.14.0 - 2026-10-29
+
+* Card: new `pv.grid_import` and `pv.battery_discharge` entities (for example the Fronius SolarNet sensors
+  `sensor.solarnet_power_grid_import` and `sensor.solarnet_power_battery_discharge`, W or kW). Each source
+  is drawn as a chip with its power and its own pipe into the heat pump (violet for the grid, green for the
+  battery, amber stays the solar line), so you see where the pump's electricity comes from. The `pv.battery`
+  level keeps working as before.
+* Card: the PV and ground loop panels of the wide layout are wider, which closes the empty space between
+  them and the heat pump, so both sides of the picture match.
+
 ## 0.13.1 - 2026-10-24
 
 * "Brine pump dT current" and "Brine pump dT set point value" now have the unit K and the state class

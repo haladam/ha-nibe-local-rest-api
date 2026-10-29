@@ -71,6 +71,8 @@ const COLOR_FLOW = "#ef4444";
 const COLOR_RETURN = "#3b82f6";
 const COLOR_BRINE = "#38bdf8";
 const COLOR_PV = "#fbbf24";
+const COLOR_GRID = "#a78bfa";
+const COLOR_BATTERY = "#34d399";
 const COLOR_COLD = "#60a5fa";
 
 /* Flow colours follow one rule: red water is the warm side, blue water the cold side. */
@@ -166,6 +168,10 @@ const TEXTS = {
     pv: "Photovoltaics",
     power: "Power",
     battery: "Battery",
+    gridSource: "Grid",
+    batterySource: "Battery",
+    gridTip: "Power drawn from the grid",
+    batteryTip: "Power drawn from the battery",
     excess: "Excess solar",
     ground: "Ground loop",
     brineIn: "Brine in",
@@ -212,6 +218,10 @@ const TEXTS = {
     pv: "Photovoltaik",
     power: "Leistung",
     battery: "Batterie",
+    gridSource: "Netz",
+    batterySource: "Batterie",
+    gridTip: "Leistung aus dem Netz",
+    batteryTip: "Leistung aus der Batterie",
     excess: "PV-Überschuss",
     ground: "Erdsonde",
     brineIn: "Sole ein",
@@ -434,7 +444,7 @@ class Plant {
       const st = this.stateObj(slot);
       parts.push(st ? `${st.state}|${st.attributes && st.attributes.raw_value}` : "-");
     }
-    for (const key of ["power", "battery", "grid"]) {
+    for (const key of ["power", "battery", "grid", "grid_import", "battery_discharge"]) {
       const st = this.pvState(key);
       parts.push(st ? st.state : "-");
     }
@@ -930,6 +940,56 @@ function drawPv(scene, box) {
     },
     { slot: "pv_surplus", label: (plant) => (plant.pvEntity("battery") ? scene.t.battery : scene.t.excess) }
   );
+  return group;
+}
+
+/**
+ * An electricity source feeding the heat pump besides the PV array (grid import, battery discharge): a small
+ * chip with an icon and the power, and the pipe from its bottom edge to the heat pump. `kind` is "grid" or
+ * "battery"; the entity comes from the card's `pv:` section (`grid_import`, `battery_discharge`).
+ */
+function drawSource(scene, kind, cx, top, pipeTo) {
+  const key = kind === "grid" ? "grid_import" : "battery_discharge";
+  const color = kind === "grid" ? COLOR_GRID : COLOR_BATTERY;
+  const w = 84;
+  const h = 32;
+  const group = svgEl("g", { class: `npc-source npc-source-${kind}` });
+  const tip = svgEl("title");
+  group.append(svgEl("rect", { x: cx - w / 2, y: top, width: w, height: h, rx: 8, class: "npc-source-box", style: `stroke: ${color}` }));
+  const ix = cx - w / 2 + 14;
+  const iy = top + h / 2;
+  const icon = svgEl("g", { class: "npc-source-icon", style: `stroke: ${color}` });
+  if (kind === "grid") {
+    // pylon: legs, two cross arms and a zigzag brace
+    icon.append(
+      svgEl("path", { d: `M ${ix - 5} ${iy + 9} L ${ix} ${iy - 9} L ${ix + 5} ${iy + 9}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 7} ${iy - 3} H ${ix + 7} M ${ix - 5} ${iy - 8} H ${ix + 5}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 4} ${iy + 5} L ${ix + 4} ${iy - 3} M ${ix + 4} ${iy + 5} L ${ix - 4} ${iy - 3}`, fill: "none" })
+    );
+  } else {
+    // battery cell with a terminal and charge bars
+    icon.append(
+      svgEl("rect", { x: ix - 8, y: iy - 5, width: 14, height: 10, rx: 1.5, fill: "none" }),
+      svgEl("path", { d: `M ${ix + 8} ${iy - 2} V ${iy + 2}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 5} ${iy - 2} V ${iy + 2} M ${ix - 1} ${iy - 2} V ${iy + 2} M ${ix + 3} ${iy - 2} V ${iy + 2}`, fill: "none" })
+    );
+  }
+  const text = svgText(cx + w / 2 - 8, top + h / 2 + 4.5, "–", { class: "npc-source-value", "text-anchor": "end" });
+  group.append(icon, text, tip);
+  scene.root.appendChild(group);
+  attachMoreInfo(scene, group, (plant) => plant.pvEntity(key));
+  scene.add((plant, hass) => {
+    const watts = plant.pvWatts(key);
+    text.textContent = wattsText(hass, watts);
+    tip.textContent = `${kind === "grid" ? scene.t.gridTip : scene.t.batteryTip}`;
+    group.classList.toggle("npc-source-idle", !(watts !== null && watts > 20));
+  });
+  drawPipe(scene, {
+    points: [[cx, top + h], ...pipeTo],
+    fallback: color,
+    energy: true,
+    active: (p) => (p.pvWatts(key) || 0) > 20 && (p.watts("power") || 0) > 20,
+  });
   return group;
 }
 
@@ -1618,6 +1678,11 @@ ${ORBIT_KEYFRAMES}
 .npc-flange-dots { fill: none; stroke: var(--npc-muted); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0.1 5.5; }
 
 /* PV -------------------------------------------------------------------- */
+.npc-source-box { fill: var(--npc-panel-bg); stroke-width: 1.5; }
+.npc-source-icon { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.npc-source-value { font-size: 12.5px; font-weight: 600; fill: var(--npc-text); font-variant-numeric: tabular-nums; }
+.npc-source-idle .npc-source-value { fill: var(--npc-muted); font-weight: 500; }
+.npc-source-idle { opacity: 0.7; }
 .npc-pv-panel { fill: #1e3a8a; stroke: var(--npc-stroke); }
 .npc-pv-cell { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .npc-sun-core { fill: #fbbf24; }
@@ -1691,8 +1756,8 @@ const heatDelivering = (plant) => plant.compressorRunning() === true || (plant.n
 /** Wide layout: ground loop | heat pump | tank and heating circuit. */
 function buildWide(scene, cfg) {
   const t = scene.t;
-  const pv = { x: 20, y: 20, w: 200, h: 150 };
-  const ground = { x: 20, y: 300, w: 200, h: 240 };
+  const pv = { x: 20, y: 20, w: 270, h: 150 };
+  const ground = { x: 20, y: 300, w: 270, h: 240 };
   const hp = { x: 360, y: 140, w: 270, h: 300 };
   const tank = { x: 700, y: 20, w: 260, h: 310 };
   const circuit = { x: 700, y: 350, w: 260, h: 190 };
@@ -1728,18 +1793,18 @@ function buildWide(scene, cfg) {
   drawPipe(scene, { points: [[690, 170], [690, tankAt.supplyY], [tankAt.x, tankAt.supplyY]], tone: TONES.warm, active: hotWater });
   drawPipe(scene, { points: [[690, 170], [690, gate.supply[1]], gate.supply], tone: TONES.circuitSupply, active: heating, visible: notPassive });
 
-  drawPipe(scene, { points: [[360, 365], [220, 365]], tone: TONES.toGround, active: gp2 });
-  drawPipe(scene, { points: [[220, 410], [360, 410]], tone: TONES.fromGround, active: gp2 });
+  drawPipe(scene, { points: [[360, 365], [290, 365]], tone: TONES.toGround, active: gp2 });
+  drawPipe(scene, { points: [[290, 410], [360, 410]], tone: TONES.fromGround, active: gp2 });
   // passive cooling: cold ground water runs into the circuit's supply port (the upper one), the warm water
   // leaves at its return port and goes back to the ground loop. The cold line takes the outer lane, so the
   // two do not cross.
   const coolingPump = (p) => p.on("cooling_pump") === true;
-  drawPipe(scene, { points: [[220, 497], [672, 497], [672, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
-  drawPipe(scene, { points: [gate.ret, [690, gate.ret[1]], [690, 520], [220, 520]], tone: TONES.warm, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [[290, 497], [672, 497], [672, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [gate.ret, [690, gate.ret[1]], [690, 520], [290, 520]], tone: TONES.warm, visible: passive, active: coolingPump });
 
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
-      points: [[220, 95], [495, 95], [495, 140]],
+      points: [[290, 95], [420, 95], [420, 140]],
       fallback: COLOR_PV,
       energy: true,
       active: (p) => (pvPower(p) || 0) > 20 && (p.watts("power") || 0) > 20,
@@ -1747,13 +1812,16 @@ function buildWide(scene, cfg) {
   }
 
   if (hasPv(scene.plant)) drawPv(scene, pv);
+  // grid and battery enter the heat pump's top edge next to the PV line
+  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 485, 40, [[485, 140]]);
+  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 575, 40, [[575, 140]]);
   drawGround(scene, ground);
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, cfg.tank);
   drawCircuit(scene, circuit, cfg.circuit, gate);
 
   drawValve(scene, 690, 170);
-  drawPump(scene, 258, 410, (p) => (p.num("gp2") || 0) > 0, {
+  drawPump(scene, 325, 410, (p) => (p.num("gp2") || 0) > 0, {
     slot: "gp2", label: "GP2", caption: (p, h) => percentText(h, p.num("gp2")),
   });
   drawPump(scene, 653, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
@@ -1824,6 +1892,9 @@ function buildNarrow(scene, cfg) {
     });
     drawPv(scene, pv);
   }
+  // grid and battery: chips in the gap between the top panels and the heat pump
+  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 165, 206, [[165, 270]]);
+  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 255, 206, [[255, 270]]);
   drawGround(scene, ground, "bottom");
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, { ...cfg.tank, compact: true });

@@ -21,6 +21,8 @@ device: <device id>               # only if two NIBE heat pumps are set up
 pv:
   power: sensor.pv_power          # PV production, W or kW (the card shows the pump's own PV value without it)
   battery: sensor.battery_soc     # optional: shows this battery level instead of "Excess solar"
+  grid_import: sensor.solarnet_power_grid_import          # optional: power drawn from the grid, W or kW
+  battery_discharge: sensor.solarnet_power_battery_discharge  # optional: power drawn from the battery, W or kW
 heatpump:
   name: NIBE S1155
 tank:
@@ -99,6 +101,11 @@ Notes
   take the drawing as a faithful picture of how that kind works, not as a photo of your unit.
 * "Excess solar" is the PV surplus power that was passed to the heat pump (point 14314, enabled
   by default, filled by your own automation). It is replaced by the battery level if `pv.battery` is set.
+* `pv.grid_import` and `pv.battery_discharge` add a chip with the power for each source above the heat
+  pump (between the top panels and the heat pump in the narrow layout), with its own pipe into the heat
+  pump: violet for the grid, green for the battery, next to the amber solar line. A pipe moves while its
+  source delivers more than 20 W and the pump draws power; at 0 W the chip is dimmed. Click a chip for
+  the entity's history. Without the key the chip is not drawn.
 * The tank is drawn after the KNV Greenwater: insulation, a domed hot water vessel with cold water
   in and hot water out on top, and the heating water zone with the round flange below. The heat
   pump's supply meets the upper left connection and the return leaves from the bottom left one.

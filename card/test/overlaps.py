@@ -71,7 +71,7 @@ def check(shots):
 
 if __name__ == "__main__":
     pv = {"extra_states": {"sensor.pv_power": {"entity_id": "sensor.pv_power", "state": "3.48", "attributes": {"unit_of_measurement": "kW"}}}}
-    cfg = {"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv_power", "battery": "sensor.pv_power"}}
+    cfg = {"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv_power", "battery": "sensor.pv_power", "grid_import": "sensor.pv_power", "battery_discharge": "sensor.pv_power"}}
     shots = []
     for layout, width in (("wide", 900), ("narrow", 380)):
         for sc in ("idle", "heating", "hotwater", "cooling", "boost", "alarm"):

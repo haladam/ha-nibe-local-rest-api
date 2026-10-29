@@ -66,6 +66,56 @@ function drawPv(scene, box) {
   return group;
 }
 
+/**
+ * An electricity source feeding the heat pump besides the PV array (grid import, battery discharge): a small
+ * chip with an icon and the power, and the pipe from its bottom edge to the heat pump. `kind` is "grid" or
+ * "battery"; the entity comes from the card's `pv:` section (`grid_import`, `battery_discharge`).
+ */
+function drawSource(scene, kind, cx, top, pipeTo) {
+  const key = kind === "grid" ? "grid_import" : "battery_discharge";
+  const color = kind === "grid" ? COLOR_GRID : COLOR_BATTERY;
+  const w = 84;
+  const h = 32;
+  const group = svgEl("g", { class: `npc-source npc-source-${kind}` });
+  const tip = svgEl("title");
+  group.append(svgEl("rect", { x: cx - w / 2, y: top, width: w, height: h, rx: 8, class: "npc-source-box", style: `stroke: ${color}` }));
+  const ix = cx - w / 2 + 14;
+  const iy = top + h / 2;
+  const icon = svgEl("g", { class: "npc-source-icon", style: `stroke: ${color}` });
+  if (kind === "grid") {
+    // pylon: legs, two cross arms and a zigzag brace
+    icon.append(
+      svgEl("path", { d: `M ${ix - 5} ${iy + 9} L ${ix} ${iy - 9} L ${ix + 5} ${iy + 9}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 7} ${iy - 3} H ${ix + 7} M ${ix - 5} ${iy - 8} H ${ix + 5}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 4} ${iy + 5} L ${ix + 4} ${iy - 3} M ${ix + 4} ${iy + 5} L ${ix - 4} ${iy - 3}`, fill: "none" })
+    );
+  } else {
+    // battery cell with a terminal and charge bars
+    icon.append(
+      svgEl("rect", { x: ix - 8, y: iy - 5, width: 14, height: 10, rx: 1.5, fill: "none" }),
+      svgEl("path", { d: `M ${ix + 8} ${iy - 2} V ${iy + 2}`, fill: "none" }),
+      svgEl("path", { d: `M ${ix - 5} ${iy - 2} V ${iy + 2} M ${ix - 1} ${iy - 2} V ${iy + 2} M ${ix + 3} ${iy - 2} V ${iy + 2}`, fill: "none" })
+    );
+  }
+  const text = svgText(cx + w / 2 - 8, top + h / 2 + 4.5, "–", { class: "npc-source-value", "text-anchor": "end" });
+  group.append(icon, text, tip);
+  scene.root.appendChild(group);
+  attachMoreInfo(scene, group, (plant) => plant.pvEntity(key));
+  scene.add((plant, hass) => {
+    const watts = plant.pvWatts(key);
+    text.textContent = wattsText(hass, watts);
+    tip.textContent = `${kind === "grid" ? scene.t.gridTip : scene.t.batteryTip}`;
+    group.classList.toggle("npc-source-idle", !(watts !== null && watts > 20));
+  });
+  drawPipe(scene, {
+    points: [[cx, top + h], ...pipeTo],
+    fallback: color,
+    energy: true,
+    active: (p) => (p.pvWatts(key) || 0) > 20 && (p.watts("power") || 0) > 20,
+  });
+  return group;
+}
+
 /** PV production in watts: the configured entity, else what the pump itself reports. */
 function pvPower(plant) {
   if (plant.pvEntity("power")) return plant.pvWatts("power");

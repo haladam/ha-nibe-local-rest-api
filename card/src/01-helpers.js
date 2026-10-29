@@ -18,6 +18,8 @@ const COLOR_FLOW = "#ef4444";
 const COLOR_RETURN = "#3b82f6";
 const COLOR_BRINE = "#38bdf8";
 const COLOR_PV = "#fbbf24";
+const COLOR_GRID = "#a78bfa";
+const COLOR_BATTERY = "#34d399";
 const COLOR_COLD = "#60a5fa";
 
 /* Flow colours follow one rule: red water is the warm side, blue water the cold side. */
@@ -113,6 +115,10 @@ const TEXTS = {
     pv: "Photovoltaics",
     power: "Power",
     battery: "Battery",
+    gridSource: "Grid",
+    batterySource: "Battery",
+    gridTip: "Power drawn from the grid",
+    batteryTip: "Power drawn from the battery",
     excess: "Excess solar",
     ground: "Ground loop",
     brineIn: "Brine in",
@@ -159,6 +165,10 @@ const TEXTS = {
     pv: "Photovoltaik",
     power: "Leistung",
     battery: "Batterie",
+    gridSource: "Netz",
+    batterySource: "Batterie",
+    gridTip: "Leistung aus dem Netz",
+    batteryTip: "Leistung aus der Batterie",
     excess: "PV-Überschuss",
     ground: "Erdsonde",
     brineIn: "Sole ein",

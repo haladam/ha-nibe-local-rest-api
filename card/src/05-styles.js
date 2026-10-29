@@ -137,6 +137,11 @@ ${ORBIT_KEYFRAMES}
 .npc-flange-dots { fill: none; stroke: var(--npc-muted); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0.1 5.5; }
 
 /* PV -------------------------------------------------------------------- */
+.npc-source-box { fill: var(--npc-panel-bg); stroke-width: 1.5; }
+.npc-source-icon { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.npc-source-value { font-size: 12.5px; font-weight: 600; fill: var(--npc-text); font-variant-numeric: tabular-nums; }
+.npc-source-idle .npc-source-value { fill: var(--npc-muted); font-weight: 500; }
+.npc-source-idle { opacity: 0.7; }
 .npc-pv-panel { fill: #1e3a8a; stroke: var(--npc-stroke); }
 .npc-pv-cell { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .npc-sun-core { fill: #fbbf24; }

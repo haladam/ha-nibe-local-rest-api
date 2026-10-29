@@ -293,6 +293,34 @@ with sync_playwright() as p:
     pg = Page(browser, "heating", extra=fr("unavailable"), config=cfgf, errors=errs); pairs = pg.read()["pairs"]
     check("Fronius sensor unavailable (night, inverter asleep): dash instead of a number, no errors", pairs[0] == ["Power", "–"] and not errs, (pairs[:2], errs)); pg.close()
 
+    # ---- grid import and battery discharge as extra power sources
+    def src_state(eid, v, u="W"): return {eid: {"entity_id": eid, "state": v, "attributes": {"unit_of_measurement": u}}}
+    SRC_JS = """() => [...window.__card.shadowRoot.querySelectorAll('.npc-source')].map(g => ({kind: g.classList.contains('npc-source-grid') ? 'grid' : 'battery', text: g.querySelector('.npc-source-value').textContent, tip: g.querySelector('title').textContent, idle: g.classList.contains('npc-source-idle')}))"""
+    cfgs = {"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv", "grid_import": "sensor.gi", "battery_discharge": "sensor.bd"}}
+    pg = Page(browser, "heating", extra={**pv_state("3000"), **src_state("sensor.gi", "1.2", "kW"), **src_state("sensor.bd", "850")}, config=cfgs, errors=errs)
+    src = pg.page.evaluate(SRC_JS)
+    check("grid import and battery discharge: one chip each, kW converted to watts", [(x["kind"], x["text"]) for x in src] == [("grid", "1,200 W"), ("battery", "850 W")], src)
+    check("the chips name their source in a tooltip", [x["tip"] for x in src] == ["Power drawn from the grid", "Power drawn from the battery"], src)
+    pipes = pg.page.evaluate("() => [...window.__card.shadowRoot.querySelectorAll('.npc-energy')].map(g => { const id = g.querySelector('.npc-pipe').getAttribute('stroke').slice(5, -1); return window.__card.shadowRoot.getElementById(id).querySelector('stop').getAttribute('stop-color'); }).join()")
+    check("each source has its own pipe colour into the heat pump (PV, grid, battery)", len(set(pipes.split(","))) == 3, pipes)
+    check("active sources are not drawn idle", not any(x["idle"] for x in src), src)
+    pg.states["sensor.bd"]["state"] = "0"; pg.push()
+    check("a source at 0 W is drawn idle", [x["idle"] for x in pg.page.evaluate(SRC_JS)] == [False, True], pg.page.evaluate(SRC_JS))
+    pg.states["sensor.gi"]["state"] = "unavailable"; pg.push()
+    check("an unavailable source shows a dash", pg.page.evaluate(SRC_JS)[0]["text"] == "–", pg.page.evaluate(SRC_JS))
+    pg.page.evaluate("window.__moreInfo.length = 0")
+    pg.page.evaluate("() => window.__card.shadowRoot.querySelector('.npc-source-battery').dispatchEvent(new MouseEvent('click', {bubbles: true, composed: true}))")
+    check("clicking a source opens its entity", pg.page.evaluate("window.__moreInfo") == ["sensor.bd"], pg.page.evaluate("window.__moreInfo"))
+    check("no errors with sources", not errs, errs); pg.close()
+    pg = Page(browser, "heating", extra={**pv_state("3000"), **src_state("sensor.gi", "300")}, config={"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv", "grid_import": "sensor.gi"}})
+    check("only the configured sources are drawn", [x["kind"] for x in pg.page.evaluate(SRC_JS)] == ["grid"], pg.page.evaluate(SRC_JS)); pg.close()
+    pg = Page(browser, "heating", extra={**pv_state("3000"), **src_state("sensor.gi", "300"), **src_state("sensor.bd", "9")}, config=cfgs, lang="de")
+    check("German tooltips", pg.page.evaluate(SRC_JS)[0]["tip"] == "Leistung aus dem Netz", pg.page.evaluate(SRC_JS)); pg.close()
+    pg = Page(browser, "heating", extra={**pv_state("3000"), **src_state("sensor.gi", "300"), **src_state("sensor.bd", "9")}, config=cfgs, width=380)
+    check("the narrow layout draws both sources too", len(pg.page.evaluate(SRC_JS)) == 2 and pg.read()["viewBox"] == "0 0 480 1010", pg.read()["viewBox"]); pg.close()
+    pg = Page(browser, "heating", config={"type": "custom:nibe-plant-card"})
+    check("without grid_import / battery_discharge no source chip exists", pg.page.evaluate(SRC_JS) == []); pg.close()
+
     # ---- circuit panel: same flow animation as the ground loop (gradient + moving dots), no wave lines
     RED, BLUE = "#ef4444", "#3b82f6"
     EMITTER = """() => { const root = window.__card.shadowRoot; const svg = root.querySelector('svg');
@@ -404,7 +432,7 @@ with sync_playwright() as p:
 
     # ---- the emitter pipe is one continuous line from the supply port to the return port, like the ground loop
     # (heat pump supply, heat pump return, circuit supply port, circuit return port, ground port of the cold passive pipe, ground port of the warm one)
-    LOOP = {900: ("wide", (630, 170), (630, 340), (700, 412), (700, 457), (220, 497), (220, 520)),
+    LOOP = {900: ("wide", (630, 170), (630, 340), (700, 412), (700, 457), (290, 497), (290, 520)),
             380: ("phone", (260, 570), (340, 570), (290, 684), (380, 684), (430, 160), (430, 130))}
     for width, (lay, hp_s, hp_r, c_s, c_r, g_c, g_w) in LOOP.items():
         for typ in ("underfloor", "radiator", "both"):
@@ -451,8 +479,8 @@ with sync_playwright() as p:
     LINES = {
         900: dict(trunk_s=((630, 170), (690, 170)), tank_s=((690, 170), (778, 129)), circ_s=((690, 170), (700, 412)),
                   trunk_r=((645, 340), (630, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 457), (645, 340)),
-                  to_ground=((360, 365), (220, 365)), from_ground=((220, 410), (360, 410)),
-                  cool_s=((220, 497), (700, 412)), cool_r=((700, 457), (220, 520))),
+                  to_ground=((360, 365), (290, 365)), from_ground=((290, 410), (360, 410)),
+                  cool_s=((290, 497), (700, 412)), cool_r=((700, 457), (290, 520))),
         380: dict(trunk_s=((260, 570), (260, 648)), tank_s=((260, 648), (66, 760)), circ_s=((260, 648), (290, 684)),
                   trunk_r=((340, 588), (340, 570)), tank_r=((66, 868), (340, 588)), circ_r=((380, 684), (340, 588)),
                   to_ground=((305, 270), (305, 200)), from_ground=((350, 200), (350, 270)),
@@ -482,7 +510,7 @@ with sync_playwright() as p:
               find(pipes, *L["circ_s"]) is None and find(pipes, *L["circ_r"]) is None and find(pipes, *L["cool_s"]) is not None and find(pipes, *L["cool_r"]) is not None)
     pg = Page(browser, "heating", extra={"sensor.pv": {"entity_id": "sensor.pv", "state": "2000", "attributes": {"unit_of_measurement": "W"}}}, config={"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv"}})
     pipes = pg.page.evaluate(PIPES); pg.close()
-    check("the solar line keeps its own colour (amber)", colour(pipes, (220, 95), (495, 140)) == (AMBER, AMBER), [p for p in pipes if p["a"] == [220, 95]])
+    check("the solar line keeps its own colour (amber)", colour(pipes, (290, 95), (420, 140)) == (AMBER, AMBER), [p for p in pipes if p["a"] == [290, 95]])
     # no hot water circulation pump by default (the plant has none); `tank.circulation: true` draws the loop
     PUMPS = "() => [...window.__card.shadowRoot.querySelectorAll('.npc-pump title')].map(t => t.textContent)"
     CAPS = "() => [...window.__card.shadowRoot.querySelectorAll('.npc-tank > .npc-caption')].map(t => t.textContent)"
