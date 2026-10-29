@@ -186,7 +186,8 @@ function drawPipe(scene, options) {
     // `tone` ("warm" or "cold") gives the fixed red / blue flow colours; `from` / `to` colour by temperature
     const from = options.tone ? toneColor(options.tone(plant)) : options.from ? tempColor(options.from(plant)) : null;
     const to = options.toneTo ? toneColor(options.toneTo(plant)) : options.to ? tempColor(options.to(plant)) : null;
-    const start = from || options.fallback || COLOR_FLOW;
+    const fallback = typeof options.fallback === "function" ? options.fallback(plant) : options.fallback;
+    const start = from || fallback || COLOR_FLOW;
     stopA.setAttribute("stop-color", start);
     stopB.setAttribute("stop-color", to || start);
     const visible = options.visible ? options.visible(plant) : true;

@@ -101,11 +101,12 @@ Notes
   take the drawing as a faithful picture of how that kind works, not as a photo of your unit.
 * "Excess solar" is the PV surplus power that was passed to the heat pump (point 14314, enabled
   by default, filled by your own automation). It is replaced by the battery level if `pv.battery` is set.
-* `pv.grid_import` and `pv.battery_discharge` add a chip with the power for each source above the heat
-  pump (between the top panels and the heat pump in the narrow layout), with its own pipe into the heat
-  pump: violet for the grid, green for the battery, next to the amber solar line. A pipe moves while its
-  source delivers more than 20 W and the pump draws power; at 0 W the chip is dimmed. Click a chip for
-  the entity's history. Without the key the chip is not drawn.
+* Solar, grid and battery are alternatives, so the top left panel shows the one that is delivering power
+  right now: the largest of the PV power, `pv.grid_import` and `pv.battery_discharge` above 20 W (solar
+  when none is). Each has its own picture (solar module and sun, pylon with wires, battery cell), title
+  and pipe colour into the heat pump (amber, violet, green). With the battery shown, the second value is
+  the `pv.battery` level if you set it; on the grid it is empty. Clicking the power opens the entity of
+  the source shown.
 * The tank is drawn after the KNV Greenwater: insulation, a domed hot water vessel with cold water
   in and hot water out on top, and the heating water zone with the round flange below. The heat
   pump's supply meets the upper left connection and the return leaves from the bottom left one.

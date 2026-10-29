@@ -3,8 +3,12 @@
  * Layouts
  * ========================================================================= */
 
+const sourceColor = (plant) => ({ grid: COLOR_GRID, battery: COLOR_BATTERY }[activeSource(plant)] || COLOR_PV);
+
 function hasPv(plant) {
-  return Boolean(plant.pvEntity("power") || plant.entityId("pv_surplus") || plant.entityId("pv_pump"));
+  return Boolean(
+    plant.pvEntity("power") || plant.pvEntity("grid_import") || plant.pvEntity("battery_discharge") || plant.entityId("pv_surplus") || plant.entityId("pv_pump")
+  );
 }
 
 const WARM = "warm";
@@ -79,17 +83,14 @@ function buildWide(scene, cfg) {
 
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
-      points: [[290, 95], [420, 95], [420, 140]],
-      fallback: COLOR_PV,
+      points: [[290, 95], [495, 95], [495, 140]],
+      fallback: sourceColor,
       energy: true,
-      active: (p) => (pvPower(p) || 0) > 20 && (p.watts("power") || 0) > 20,
+      active: (p) => (sourceWatts(p, activeSource(p)) || 0) > 20 && (p.watts("power") || 0) > 20,
     });
   }
 
   if (hasPv(scene.plant)) drawPv(scene, pv);
-  // grid and battery enter the heat pump's top edge next to the PV line
-  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 485, 40, [[485, 140]]);
-  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 575, 40, [[575, 140]]);
   drawGround(scene, ground);
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, cfg.tank);
@@ -161,15 +162,12 @@ function buildNarrow(scene, cfg) {
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
       points: [[112, 200], [112, 270]],
-      fallback: COLOR_PV,
+      fallback: sourceColor,
       energy: true,
-      active: (p) => (pvPower(p) || 0) > 20 && (p.watts("power") || 0) > 20,
+      active: (p) => (sourceWatts(p, activeSource(p)) || 0) > 20 && (p.watts("power") || 0) > 20,
     });
     drawPv(scene, pv);
   }
-  // grid and battery: chips in the gap between the top panels and the heat pump
-  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 165, 206, [[165, 270]]);
-  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 255, 206, [[255, 270]]);
   drawGround(scene, ground, "bottom");
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, { ...cfg.tank, compact: true });

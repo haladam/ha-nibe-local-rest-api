@@ -4,6 +4,13 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.14.1 - 2026-10-29
+
+* Card: the grid and battery sources of 0.14.0 were separate chips and looked cluttered. As solar, grid
+  and battery are alternatives, the one top left panel now shows whichever is delivering power (the largest
+  above 20 W, solar when none): the solar module, a pylon with wires, or a battery cell, with its own title,
+  power and pipe colour. The wide layout's single pipe enters the heat pump in the middle again.
+
 ## 0.14.0 - 2026-10-29
 
 * Card: new `pv.grid_import` and `pv.battery_discharge` entities (for example the Fronius SolarNet sensors

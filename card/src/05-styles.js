@@ -137,11 +137,20 @@ ${ORBIT_KEYFRAMES}
 .npc-flange-dots { fill: none; stroke: var(--npc-muted); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0.1 5.5; }
 
 /* PV -------------------------------------------------------------------- */
-.npc-source-box { fill: var(--npc-panel-bg); stroke-width: 1.5; }
-.npc-source-icon { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.npc-source-value { font-size: 12.5px; font-weight: 600; fill: var(--npc-text); font-variant-numeric: tabular-nums; }
-.npc-source-idle .npc-source-value { fill: var(--npc-muted); font-weight: 500; }
-.npc-source-idle { opacity: 0.7; }
+.npc-grid-line { stroke: var(--npc-muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.6s ease; }
+.npc-grid-dot { fill: var(--npc-muted); transition: fill 0.6s ease; }
+.npc-source-live .npc-grid-line { stroke: #8b5cf6; }
+.npc-source-live .npc-grid-dot { fill: #8b5cf6; }
+.npc-battery-body { stroke: var(--npc-muted); stroke-width: 2.4; transition: stroke 0.6s ease; }
+.npc-battery-cap { fill: var(--npc-muted); transition: fill 0.6s ease; }
+.npc-battery-bar { fill: var(--npc-muted); opacity: 0.35; transition: fill 0.6s ease, opacity 0.6s ease; }
+.npc-source-live .npc-battery-body { stroke: #10b981; }
+.npc-source-live .npc-battery-cap { fill: #10b981; }
+.npc-source-live .npc-battery-bar { fill: #10b981; opacity: 1; animation: npc-charge 2.4s ease-in-out infinite; }
+.npc-source-live .npc-battery-bar:nth-of-type(3) { animation-delay: 0.2s; }
+.npc-source-live .npc-battery-bar:nth-of-type(4) { animation-delay: 0.4s; }
+.npc-source-live .npc-battery-bar:nth-of-type(5) { animation-delay: 0.6s; }
+@keyframes npc-charge { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 .npc-pv-panel { fill: #1e3a8a; stroke: var(--npc-stroke); }
 .npc-pv-cell { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .npc-sun-core { fill: #fbbf24; }
@@ -178,7 +187,7 @@ ${ORBIT_KEYFRAMES}
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }
 
 @media (prefers-reduced-motion: reduce) {
-  .npc-spin, .npc-orbit, .npc-dots, .npc-sun { animation: none !important; }
+  .npc-spin, .npc-orbit, .npc-dots, .npc-sun, .npc-battery-bar { animation: none !important; }
 }
 .npc-svg:not(.npc-animated) .npc-spin, .npc-svg:not(.npc-animated) .npc-orbit { animation: none; }
 `;

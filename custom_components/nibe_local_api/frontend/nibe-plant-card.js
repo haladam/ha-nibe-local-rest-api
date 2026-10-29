@@ -170,8 +170,6 @@ const TEXTS = {
     battery: "Battery",
     gridSource: "Grid",
     batterySource: "Battery",
-    gridTip: "Power drawn from the grid",
-    batteryTip: "Power drawn from the battery",
     excess: "Excess solar",
     ground: "Ground loop",
     brineIn: "Brine in",
@@ -220,8 +218,6 @@ const TEXTS = {
     battery: "Batterie",
     gridSource: "Netz",
     batterySource: "Batterie",
-    gridTip: "Leistung aus dem Netz",
-    batteryTip: "Leistung aus der Batterie",
     excess: "PV-Überschuss",
     ground: "Erdsonde",
     brineIn: "Sole ein",
@@ -762,7 +758,8 @@ function drawPipe(scene, options) {
     // `tone` ("warm" or "cold") gives the fixed red / blue flow colours; `from` / `to` colour by temperature
     const from = options.tone ? toneColor(options.tone(plant)) : options.from ? tempColor(options.from(plant)) : null;
     const to = options.toneTo ? toneColor(options.toneTo(plant)) : options.to ? tempColor(options.to(plant)) : null;
-    const start = from || options.fallback || COLOR_FLOW;
+    const fallback = typeof options.fallback === "function" ? options.fallback(plant) : options.fallback;
+    const start = from || fallback || COLOR_FLOW;
     stopA.setAttribute("stop-color", start);
     stopB.setAttribute("stop-color", to || start);
     const visible = options.visible ? options.visible(plant) : true;
@@ -896,12 +893,24 @@ function percentText(hass, value) {
   return value === null ? "" : `${formatNumber(hass, Math.round(value), 0)} %`;
 }
 
-/** PV panel: photovoltaic power, optional battery, surplus handed to the pump. */
+/**
+ * Electricity source panel. Solar, grid and battery are alternatives, so the panel shows the one that is
+ * delivering power right now (the largest of the three above 20 W; solar when nothing is): its own picture,
+ * title and power, and its own colour on the pipe to the heat pump.
+ */
 function drawPv(scene, box) {
   const group = drawPanel(scene, box, scene.t.pv, { className: "npc-pv" });
-  // module with cells and a sun
+  const title = group.querySelector(".npc-title");
   const px = box.x + 16;
   const py = box.y + 40;
+  const art = (kind) => {
+    const g = svgEl("g", { class: `npc-source-art npc-source-${kind}` });
+    group.appendChild(g);
+    return g;
+  };
+
+  // solar: module with cells and a sun
+  const solar = art("solar");
   const panel = svgEl("g", { class: "npc-pv-art" });
   panel.appendChild(svgEl("path", { d: `M ${px + 12} ${py} L ${px + 82} ${py} L ${px + 70} ${py + 46} L ${px} ${py + 46} Z`, class: "npc-pv-panel" }));
   for (let i = 1; i < 4; i++) {
@@ -909,7 +918,7 @@ function drawPv(scene, box) {
     panel.appendChild(svgEl("line", { x1: px + 12 - 12 * k, y1: py + 46 * k, x2: px + 82 - 12 * k, y2: py + 46 * k, class: "npc-pv-cell" }));
     panel.appendChild(svgEl("line", { x1: px + 12 + 70 * k, y1: py, x2: px + 70 * k, y2: py + 46, class: "npc-pv-cell" }));
   }
-  group.appendChild(panel);
+  solar.appendChild(panel);
   const sun = svgEl("g", { class: "npc-sun" });
   sun.appendChild(svgEl("circle", { r: 11, class: "npc-sun-core" }));
   const rays = svgEl("g", { class: "npc-rays" });
@@ -917,14 +926,53 @@ function drawPv(scene, box) {
     rays.appendChild(svgEl("line", { x1: 0, y1: -16, x2: 0, y2: -21, transform: `rotate(${i * 45})` }));
   }
   sun.appendChild(rays);
-  group.appendChild(svgEl("g", { transform: `translate(${box.x + box.w - 46} ${box.y + 66})` }, [sun]));
+  solar.appendChild(svgEl("g", { transform: `translate(${box.x + box.w - 46} ${box.y + 66})` }, [sun]));
+
+  // grid: a transmission pylon with its wires running off to the side
+  const grid = art("grid");
+  const mx = px + 34;
+  const line = (d) => svgEl("path", { d, class: "npc-grid-line", fill: "none" });
+  const top = py + 2;
+  const foot = py + 48;
+  grid.append(
+    // legs, cross arms, a bar between the legs and the X brace
+    line(`M ${mx - 15} ${foot} L ${mx - 3} ${top} M ${mx + 15} ${foot} L ${mx + 3} ${top}`),
+    line(`M ${mx - 24} ${py + 12} H ${mx + 24} M ${mx - 19} ${py + 26} H ${mx + 19} M ${mx - 12} ${py + 38} H ${mx + 12}`),
+    line(`M ${mx - 19} ${py + 26} L ${mx + 12} ${py + 38} M ${mx + 19} ${py + 26} L ${mx - 12} ${py + 38}`),
+    // the wires leave from the arm tips and sag across to the right
+    line(`M ${mx + 24} ${py + 12} Q ${mx + 70} ${py + 30} ${mx + 116} ${py + 12}`),
+    line(`M ${mx + 19} ${py + 26} Q ${mx + 68} ${py + 44} ${mx + 116} ${py + 26}`)
+  );
+  grid.append(
+    svgEl("circle", { cx: mx + 24, cy: py + 12, r: 2.6, class: "npc-grid-dot" }),
+    svgEl("circle", { cx: mx + 19, cy: py + 26, r: 2.6, class: "npc-grid-dot" })
+  );
+
+  // battery: a cell with its terminal and charge bars
+  const battery = art("battery");
+  const bx = px + 6;
+  battery.appendChild(svgEl("rect", { x: bx, y: py + 4, width: 84, height: 42, rx: 6, class: "npc-battery-body", fill: "none" }));
+  battery.appendChild(svgEl("rect", { x: bx + 84, y: py + 16, width: 6, height: 18, rx: 2, class: "npc-battery-cap" }));
+  for (let i = 0; i < 4; i++) {
+    battery.appendChild(svgEl("rect", { x: bx + 7 + i * 19, y: py + 11, width: 15, height: 28, rx: 3, class: "npc-battery-bar" }));
+  }
+
   scene.add((plant) => {
-    const w = pvPower(plant);
-    group.classList.toggle("npc-running", w !== null && w > 20);
+    const source = activeSource(plant);
+    const w = sourceWatts(plant, source);
+    group.classList.toggle("npc-running", source === "solar" && w !== null && w > 20);
+    group.classList.toggle("npc-source-live", source !== "solar" && w !== null && w > 20);
+    solar.style.display = source === "solar" ? "" : "none";
+    grid.style.display = source === "grid" ? "" : "none";
+    battery.style.display = source === "battery" ? "" : "none";
+    title.textContent = source === "grid" ? scene.t.gridSource : source === "battery" ? scene.t.batterySource : scene.t.pv;
   });
 
   const col2 = box.x + box.w / 2 + 6;
-  drawReadout(scene, group, box.x + 16, box.y + box.h - 38, scene.t.power, (plant, hass) => wattsText(hass, pvPower(plant)), { strong: true });
+  drawReadout(scene, group, box.x + 16, box.y + box.h - 38, scene.t.power, (plant, hass) => wattsText(hass, sourceWatts(plant, activeSource(plant))), {
+    strong: true,
+    slot: (plant) => sourceEntity(plant, activeSource(plant)),
+  });
   drawReadout(
     scene,
     group,
@@ -932,65 +980,52 @@ function drawPv(scene, box) {
     box.y + box.h - 38,
     scene.t.excess,
     (plant, hass) => {
+      const source = activeSource(plant);
+      if (source === "grid") return "";
       if (plant.pvEntity("battery")) {
         const v = plant.pvNum("battery");
         return v === null ? "–" : `${formatNumber(hass, Math.round(v), 0)} %`;
       }
+      if (source === "battery") return "";
       return wattsText(hass, plant.num("pv_surplus") === null ? null : plant.watts("pv_surplus"));
     },
-    { slot: "pv_surplus", label: (plant) => (plant.pvEntity("battery") ? scene.t.battery : scene.t.excess) }
+    {
+      slot: "pv_surplus",
+      label: (plant) => {
+        const source = activeSource(plant);
+        if (source === "grid" || (source === "battery" && !plant.pvEntity("battery"))) return "";
+        return plant.pvEntity("battery") ? scene.t.battery : scene.t.excess;
+      },
+    }
   );
   return group;
 }
 
-/**
- * An electricity source feeding the heat pump besides the PV array (grid import, battery discharge): a small
- * chip with an icon and the power, and the pipe from its bottom edge to the heat pump. `kind` is "grid" or
- * "battery"; the entity comes from the card's `pv:` section (`grid_import`, `battery_discharge`).
- */
-function drawSource(scene, kind, cx, top, pipeTo) {
-  const key = kind === "grid" ? "grid_import" : "battery_discharge";
-  const color = kind === "grid" ? COLOR_GRID : COLOR_BATTERY;
-  const w = 84;
-  const h = 32;
-  const group = svgEl("g", { class: `npc-source npc-source-${kind}` });
-  const tip = svgEl("title");
-  group.append(svgEl("rect", { x: cx - w / 2, y: top, width: w, height: h, rx: 8, class: "npc-source-box", style: `stroke: ${color}` }));
-  const ix = cx - w / 2 + 14;
-  const iy = top + h / 2;
-  const icon = svgEl("g", { class: "npc-source-icon", style: `stroke: ${color}` });
-  if (kind === "grid") {
-    // pylon: legs, two cross arms and a zigzag brace
-    icon.append(
-      svgEl("path", { d: `M ${ix - 5} ${iy + 9} L ${ix} ${iy - 9} L ${ix + 5} ${iy + 9}`, fill: "none" }),
-      svgEl("path", { d: `M ${ix - 7} ${iy - 3} H ${ix + 7} M ${ix - 5} ${iy - 8} H ${ix + 5}`, fill: "none" }),
-      svgEl("path", { d: `M ${ix - 4} ${iy + 5} L ${ix + 4} ${iy - 3} M ${ix + 4} ${iy + 5} L ${ix - 4} ${iy - 3}`, fill: "none" })
-    );
-  } else {
-    // battery cell with a terminal and charge bars
-    icon.append(
-      svgEl("rect", { x: ix - 8, y: iy - 5, width: 14, height: 10, rx: 1.5, fill: "none" }),
-      svgEl("path", { d: `M ${ix + 8} ${iy - 2} V ${iy + 2}`, fill: "none" }),
-      svgEl("path", { d: `M ${ix - 5} ${iy - 2} V ${iy + 2} M ${ix - 1} ${iy - 2} V ${iy + 2} M ${ix + 3} ${iy - 2} V ${iy + 2}`, fill: "none" })
-    );
+/** Which source the heat pump runs on: the one delivering the most power (above 20 W), solar when none does. */
+function activeSource(plant) {
+  let best = "solar";
+  let bestWatts = 20;
+  for (const source of ["solar", "grid", "battery"]) {
+    const w = sourceWatts(plant, source);
+    if (w !== null && w > bestWatts) {
+      best = source;
+      bestWatts = w;
+    }
   }
-  const text = svgText(cx + w / 2 - 8, top + h / 2 + 4.5, "–", { class: "npc-source-value", "text-anchor": "end" });
-  group.append(icon, text, tip);
-  scene.root.appendChild(group);
-  attachMoreInfo(scene, group, (plant) => plant.pvEntity(key));
-  scene.add((plant, hass) => {
-    const watts = plant.pvWatts(key);
-    text.textContent = wattsText(hass, watts);
-    tip.textContent = `${kind === "grid" ? scene.t.gridTip : scene.t.batteryTip}`;
-    group.classList.toggle("npc-source-idle", !(watts !== null && watts > 20));
-  });
-  drawPipe(scene, {
-    points: [[cx, top + h], ...pipeTo],
-    fallback: color,
-    energy: true,
-    active: (p) => (p.pvWatts(key) || 0) > 20 && (p.watts("power") || 0) > 20,
-  });
-  return group;
+  return best;
+}
+
+function sourceWatts(plant, source) {
+  if (source === "grid") return plant.pvEntity("grid_import") ? plant.pvWatts("grid_import") : null;
+  if (source === "battery") return plant.pvEntity("battery_discharge") ? plant.pvWatts("battery_discharge") : null;
+  return pvPower(plant);
+}
+
+/** The entity behind a source's power reading, for the more-info dialog. */
+function sourceEntity(plant, source) {
+  if (source === "grid") return plant.pvEntity("grid_import");
+  if (source === "battery") return plant.pvEntity("battery_discharge");
+  return plant.pvEntity("power") || plant.entityId("pv_pump");
 }
 
 /** PV production in watts: the configured entity, else what the pump itself reports. */
@@ -1678,11 +1713,20 @@ ${ORBIT_KEYFRAMES}
 .npc-flange-dots { fill: none; stroke: var(--npc-muted); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0.1 5.5; }
 
 /* PV -------------------------------------------------------------------- */
-.npc-source-box { fill: var(--npc-panel-bg); stroke-width: 1.5; }
-.npc-source-icon { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.npc-source-value { font-size: 12.5px; font-weight: 600; fill: var(--npc-text); font-variant-numeric: tabular-nums; }
-.npc-source-idle .npc-source-value { fill: var(--npc-muted); font-weight: 500; }
-.npc-source-idle { opacity: 0.7; }
+.npc-grid-line { stroke: var(--npc-muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.6s ease; }
+.npc-grid-dot { fill: var(--npc-muted); transition: fill 0.6s ease; }
+.npc-source-live .npc-grid-line { stroke: #8b5cf6; }
+.npc-source-live .npc-grid-dot { fill: #8b5cf6; }
+.npc-battery-body { stroke: var(--npc-muted); stroke-width: 2.4; transition: stroke 0.6s ease; }
+.npc-battery-cap { fill: var(--npc-muted); transition: fill 0.6s ease; }
+.npc-battery-bar { fill: var(--npc-muted); opacity: 0.35; transition: fill 0.6s ease, opacity 0.6s ease; }
+.npc-source-live .npc-battery-body { stroke: #10b981; }
+.npc-source-live .npc-battery-cap { fill: #10b981; }
+.npc-source-live .npc-battery-bar { fill: #10b981; opacity: 1; animation: npc-charge 2.4s ease-in-out infinite; }
+.npc-source-live .npc-battery-bar:nth-of-type(3) { animation-delay: 0.2s; }
+.npc-source-live .npc-battery-bar:nth-of-type(4) { animation-delay: 0.4s; }
+.npc-source-live .npc-battery-bar:nth-of-type(5) { animation-delay: 0.6s; }
+@keyframes npc-charge { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 .npc-pv-panel { fill: #1e3a8a; stroke: var(--npc-stroke); }
 .npc-pv-cell { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .npc-sun-core { fill: #fbbf24; }
@@ -1719,7 +1763,7 @@ ${ORBIT_KEYFRAMES}
 .npc-valve.npc-running .npc-valve-body { fill: #d97706; }
 
 @media (prefers-reduced-motion: reduce) {
-  .npc-spin, .npc-orbit, .npc-dots, .npc-sun { animation: none !important; }
+  .npc-spin, .npc-orbit, .npc-dots, .npc-sun, .npc-battery-bar { animation: none !important; }
 }
 .npc-svg:not(.npc-animated) .npc-spin, .npc-svg:not(.npc-animated) .npc-orbit { animation: none; }
 `;
@@ -1728,8 +1772,12 @@ ${ORBIT_KEYFRAMES}
  * Layouts
  * ========================================================================= */
 
+const sourceColor = (plant) => ({ grid: COLOR_GRID, battery: COLOR_BATTERY }[activeSource(plant)] || COLOR_PV);
+
 function hasPv(plant) {
-  return Boolean(plant.pvEntity("power") || plant.entityId("pv_surplus") || plant.entityId("pv_pump"));
+  return Boolean(
+    plant.pvEntity("power") || plant.pvEntity("grid_import") || plant.pvEntity("battery_discharge") || plant.entityId("pv_surplus") || plant.entityId("pv_pump")
+  );
 }
 
 const WARM = "warm";
@@ -1804,17 +1852,14 @@ function buildWide(scene, cfg) {
 
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
-      points: [[290, 95], [420, 95], [420, 140]],
-      fallback: COLOR_PV,
+      points: [[290, 95], [495, 95], [495, 140]],
+      fallback: sourceColor,
       energy: true,
-      active: (p) => (pvPower(p) || 0) > 20 && (p.watts("power") || 0) > 20,
+      active: (p) => (sourceWatts(p, activeSource(p)) || 0) > 20 && (p.watts("power") || 0) > 20,
     });
   }
 
   if (hasPv(scene.plant)) drawPv(scene, pv);
-  // grid and battery enter the heat pump's top edge next to the PV line
-  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 485, 40, [[485, 140]]);
-  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 575, 40, [[575, 140]]);
   drawGround(scene, ground);
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, cfg.tank);
@@ -1886,15 +1931,12 @@ function buildNarrow(scene, cfg) {
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
       points: [[112, 200], [112, 270]],
-      fallback: COLOR_PV,
+      fallback: sourceColor,
       energy: true,
-      active: (p) => (pvPower(p) || 0) > 20 && (p.watts("power") || 0) > 20,
+      active: (p) => (sourceWatts(p, activeSource(p)) || 0) > 20 && (p.watts("power") || 0) > 20,
     });
     drawPv(scene, pv);
   }
-  // grid and battery: chips in the gap between the top panels and the heat pump
-  if (scene.plant.pvEntity("grid_import")) drawSource(scene, "grid", 165, 206, [[165, 270]]);
-  if (scene.plant.pvEntity("battery_discharge")) drawSource(scene, "battery", 255, 206, [[255, 270]]);
   drawGround(scene, ground, "bottom");
   drawHeatPump(scene, hp, cfg.heatpump.name);
   drawTank(scene, tank, { ...cfg.tank, compact: true });
