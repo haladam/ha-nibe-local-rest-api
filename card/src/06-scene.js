@@ -35,9 +35,9 @@ const heatDelivering = (plant) => plant.compressorRunning() === true || (plant.n
 /** Wide layout: ground loop | heat pump | tank and heating circuit. */
 function buildWide(scene, cfg) {
   const t = scene.t;
-  const pv = { x: 20, y: 20, w: 270, h: 150 };
-  const ground = { x: 20, y: 300, w: 270, h: 240 };
-  const hp = { x: 360, y: 140, w: 270, h: 300 };
+  const pv = { x: 20, y: 20, w: 200, h: 150 };
+  const ground = { x: 20, y: 300, w: 200, h: 240 };
+  const hp = { x: 325, y: 140, w: 270, h: 300 };
   const tank = { x: 700, y: 20, w: 260, h: 310 };
   const circuit = { x: 700, y: 350, w: 260, h: 190 };
 
@@ -67,23 +67,23 @@ function buildWide(scene, cfg) {
     gaps: [[690, tankAt.returnY, "x"]],
   });
   drawPipe(scene, { points: [gate.ret, [645, gate.ret[1]], [645, 340]], tone: TONES.circuitReturn, active: heating, visible: notPassive });
-  drawPipe(scene, { points: [[645, 340], [630, 340]], tone: TONES.returnTrunk, active: returning });
-  drawPipe(scene, { points: [[630, 170], [690, 170]], tone: TONES.supplyTrunk, active: heatDelivering });
+  drawPipe(scene, { points: [[645, 340], [595, 340]], tone: TONES.returnTrunk, active: returning });
+  drawPipe(scene, { points: [[595, 170], [690, 170]], tone: TONES.supplyTrunk, active: heatDelivering });
   drawPipe(scene, { points: [[690, 170], [690, tankAt.supplyY], [tankAt.x, tankAt.supplyY]], tone: TONES.warm, active: hotWater });
   drawPipe(scene, { points: [[690, 170], [690, gate.supply[1]], gate.supply], tone: TONES.circuitSupply, active: heating, visible: notPassive });
 
-  drawPipe(scene, { points: [[360, 365], [290, 365]], tone: TONES.toGround, active: gp2 });
-  drawPipe(scene, { points: [[290, 410], [360, 410]], tone: TONES.fromGround, active: gp2 });
+  drawPipe(scene, { points: [[325, 365], [220, 365]], tone: TONES.toGround, active: gp2 });
+  drawPipe(scene, { points: [[220, 410], [325, 410]], tone: TONES.fromGround, active: gp2 });
   // passive cooling: cold ground water runs into the circuit's supply port (the upper one), the warm water
   // leaves at its return port and goes back to the ground loop. The cold line takes the outer lane, so the
   // two do not cross.
   const coolingPump = (p) => p.on("cooling_pump") === true;
-  drawPipe(scene, { points: [[290, 497], [672, 497], [672, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
-  drawPipe(scene, { points: [gate.ret, [690, gate.ret[1]], [690, 520], [290, 520]], tone: TONES.warm, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [[220, 497], [672, 497], [672, gate.supply[1]], gate.supply], tone: TONES.cold, visible: passive, active: coolingPump });
+  drawPipe(scene, { points: [gate.ret, [690, gate.ret[1]], [690, 520], [220, 520]], tone: TONES.warm, visible: passive, active: coolingPump });
 
   if (hasPv(scene.plant)) {
     drawPipe(scene, {
-      points: [[290, 95], [495, 95], [495, 140]],
+      points: [[220, 95], [460, 95], [460, 140]],
       fallback: sourceColor,
       energy: true,
       active: (p) => (sourceWatts(p, activeSource(p)) || 0) > 20 && (p.watts("power") || 0) > 20,
@@ -97,10 +97,10 @@ function buildWide(scene, cfg) {
   drawCircuit(scene, circuit, cfg.circuit, gate);
 
   drawValve(scene, 690, 170);
-  drawPump(scene, 325, 410, (p) => (p.num("gp2") || 0) > 0, {
+  drawPump(scene, 272, 410, (p) => (p.num("gp2") || 0) > 0, {
     slot: "gp2", label: "GP2", caption: (p, h) => percentText(h, p.num("gp2")),
   });
-  drawPump(scene, 653, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
+  drawPump(scene, 635, 170, (p) => (p.num("gp1") || 0) > 0 && heatDelivering(p), {
     slot: "gp1", label: "GP1", caption: (p, h) => percentText(h, p.num("gp1")),
   });
   if (cfg.cooling_label !== false) {

@@ -4,6 +4,12 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.14.2 - 2026-10-30
+
+* Card: instead of widening the PV and ground loop panels (0.14.0), the wide layout is back to the earlier
+  panel width and the heat pump now sits in the middle between them and the tank. The gap on each side is
+  the same, and the GP2 and GP1 pumps sit in the middle of their gaps.
+
 ## 0.14.1 - 2026-10-29
 
 * Card: the grid and battery sources of 0.14.0 were separate chips and looked cluttered. As solar, grid

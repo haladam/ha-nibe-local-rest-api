@@ -425,7 +425,7 @@ with sync_playwright() as p:
                         seen.add(b); todo.append(b)
         return any(abs(g[0] - goal[0]) <= 1 and abs(g[1] - goal[1]) <= 1 for g in seen)
     # (hp supply port, hp return port, circuit supply, circuit return, tank supply, tank return)
-    PORTS = {900: ((630, 170), (630, 340), (700, 412), (700, 457), (778, 129), (778, 244)),
+    PORTS = {900: ((595, 170), (595, 340), (700, 412), (700, 457), (778, 129), (778, 244)),
              380: ((260, 570), (340, 570), (290, 684), (380, 684), (66, 760), (66, 868))}
     for width, (hp_s, hp_r, c_s, c_r, t_s, t_r) in PORTS.items():
         lay = "wide" if width == 900 else "phone"
@@ -441,7 +441,7 @@ with sync_playwright() as p:
 
     # ---- the emitter pipe is one continuous line from the supply port to the return port, like the ground loop
     # (heat pump supply, heat pump return, circuit supply port, circuit return port, ground port of the cold passive pipe, ground port of the warm one)
-    LOOP = {900: ("wide", (630, 170), (630, 340), (700, 412), (700, 457), (290, 497), (290, 520)),
+    LOOP = {900: ("wide", (595, 170), (595, 340), (700, 412), (700, 457), (220, 497), (220, 520)),
             380: ("phone", (260, 570), (340, 570), (290, 684), (380, 684), (430, 160), (430, 130))}
     for width, (lay, hp_s, hp_r, c_s, c_r, g_c, g_w) in LOOP.items():
         for typ in ("underfloor", "radiator", "both"):
@@ -486,10 +486,10 @@ with sync_playwright() as p:
         return None if p is None else (p["c0"], p["c1"])
     # name -> (from, to) for the wide layout and for the phone layout
     LINES = {
-        900: dict(trunk_s=((630, 170), (690, 170)), tank_s=((690, 170), (778, 129)), circ_s=((690, 170), (700, 412)),
-                  trunk_r=((645, 340), (630, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 457), (645, 340)),
-                  to_ground=((360, 365), (290, 365)), from_ground=((290, 410), (360, 410)),
-                  cool_s=((290, 497), (700, 412)), cool_r=((700, 457), (290, 520))),
+        900: dict(trunk_s=((595, 170), (690, 170)), tank_s=((690, 170), (778, 129)), circ_s=((690, 170), (700, 412)),
+                  trunk_r=((645, 340), (595, 340)), tank_r=((778, 244), (645, 340)), circ_r=((700, 457), (645, 340)),
+                  to_ground=((325, 365), (220, 365)), from_ground=((220, 410), (325, 410)),
+                  cool_s=((220, 497), (700, 412)), cool_r=((700, 457), (220, 520))),
         380: dict(trunk_s=((260, 570), (260, 648)), tank_s=((260, 648), (66, 760)), circ_s=((260, 648), (290, 684)),
                   trunk_r=((340, 588), (340, 570)), tank_r=((66, 868), (340, 588)), circ_r=((380, 684), (340, 588)),
                   to_ground=((305, 270), (305, 200)), from_ground=((350, 200), (350, 270)),
@@ -519,7 +519,7 @@ with sync_playwright() as p:
               find(pipes, *L["circ_s"]) is None and find(pipes, *L["circ_r"]) is None and find(pipes, *L["cool_s"]) is not None and find(pipes, *L["cool_r"]) is not None)
     pg = Page(browser, "heating", extra={"sensor.pv": {"entity_id": "sensor.pv", "state": "2000", "attributes": {"unit_of_measurement": "W"}}}, config={"type": "custom:nibe-plant-card", "pv": {"power": "sensor.pv"}})
     pipes = pg.page.evaluate(PIPES); pg.close()
-    check("the solar line keeps its own colour (amber)", colour(pipes, (290, 95), (495, 140)) == (AMBER, AMBER), [p for p in pipes if p["a"] == [290, 95]])
+    check("the solar line keeps its own colour (amber)", colour(pipes, (220, 95), (460, 140)) == (AMBER, AMBER), [p for p in pipes if p["a"] == [220, 95]])
     # no hot water circulation pump by default (the plant has none); `tank.circulation: true` draws the loop
     PUMPS = "() => [...window.__card.shadowRoot.querySelectorAll('.npc-pump title')].map(t => t.textContent)"
     CAPS = "() => [...window.__card.shadowRoot.querySelectorAll('.npc-tank > .npc-caption')].map(t => t.textContent)"
