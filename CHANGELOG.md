@@ -4,6 +4,13 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.14.3 - 2026-11-02
+
+* Card: follows Home Assistant's dark / light mode. In light mode the coloured temperature values are
+  darkened (same hue), so the amber 25–35 °C range is readable on the light panels instead of about 2:1.
+* Card: in dark mode the tank insulation is a solid gold instead of see-through yellow, which turned olive
+  on a dark card. Without a mode from Home Assistant both look as before.
+
 ## 0.14.2 - 2026-10-30
 
 * Card: instead of widening the PV and ground loop panels (0.14.0), the wide layout is back to the earlier

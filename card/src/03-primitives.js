@@ -100,7 +100,8 @@ function drawReadout(scene, group, x, y, label, read, options) {
     valueNode.textContent = text === undefined || text === null ? "–" : text;
     block.classList.toggle("npc-unset", !text || text === "–");
     const color = out && typeof out === "object" ? out.color : null;
-    valueNode.style.fill = color || "";
+    // --npc-tint-keep is 100 % in dark mode (colour unchanged) and lower in light mode (colour darkened)
+    valueNode.style.fill = color ? `color-mix(in srgb, ${color} var(--npc-tint-keep, 100%), #000)` : "";
     if (opts.label) labelNode.textContent = opts.label(plant, hass);
     if (tipNode) tipNode.textContent = opts.title(plant, hass) || "";
   });

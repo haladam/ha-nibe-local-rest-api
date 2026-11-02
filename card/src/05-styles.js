@@ -33,6 +33,8 @@ ha-card.npc-has-title { padding-top: 4px; }
   --npc-surface: var(--card-background-color, #fff);
   --npc-panel-bg: rgba(127, 127, 127, 0.10);
 }
+/* light mode: temperature text keeps its hue but is darkened, about 4.5:1 for the amber range on the panels */
+ha-card.npc-light { --npc-tint-keep: 55%; }
 /* wide layout: never taller than the window (room is left for the header and the margins around the card);
    the picture keeps its proportions and is centred. The floor keeps it readable in a very short window. */
 ha-card.npc-fit .npc-svg {
@@ -125,6 +127,8 @@ ${ORBIT_KEYFRAMES}
 
 /* tank ------------------------------------------------------------------ */
 .npc-insulation { fill: rgba(250, 204, 21, 0.5); stroke: rgba(180, 140, 0, 0.45); stroke-width: 1; }
+/* see-through yellow turns olive on a dark card, so dark mode gets a solid insulation colour */
+ha-card.npc-dark .npc-insulation { fill: #c9a227; stroke: #8a6d1c; }
 .npc-jacket { fill: rgba(127, 127, 127, 0.2); stroke: var(--npc-stroke); stroke-width: 1.5; transition: fill 1s ease; }
 .npc-jacket-on { fill-opacity: 0.8; }
 .npc-dhw { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.4; }

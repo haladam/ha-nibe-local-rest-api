@@ -59,6 +59,7 @@ class NibePlantCard extends HTMLElement {
     this._hass = hass;
     if (!this._config) return;
     this._plant.setHass(hass);
+    this._applyMode();
     const language = hass.locale ? hass.locale.language : hass.language;
     if (!this._scene || language !== this._language) {
       this._language = language;
@@ -110,12 +111,22 @@ class NibePlantCard extends HTMLElement {
     return width && width < NARROW_BELOW ? "narrow" : "wide";
   }
 
+  /** Marks HA's dark or light mode on the card (temperature text and tank insulation differ). */
+  _applyMode() {
+    if (!this._card) return;
+    const themes = this._hass && this._hass.themes;
+    this._card.classList.toggle("npc-light", !!themes && themes.darkMode === false);
+    this._card.classList.toggle("npc-dark", !!themes && themes.darkMode === true);
+  }
+
   _render() {
     const root = this.shadowRoot;
     while (root.firstChild) root.removeChild(root.firstChild);
     root.appendChild(Object.assign(document.createElement("style"), { textContent: CARD_STYLES }));
     const card = document.createElement("ha-card");
     root.appendChild(card);
+    this._card = card;
+    this._applyMode();
     if (this._config.title) {
       card.classList.add("npc-has-title");
       const header = document.createElement("div");

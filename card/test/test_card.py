@@ -1,5 +1,5 @@
 """Behaviour tests of nibe-plant-card.js in Chromium with a mock `hass` built from fixtures/points_live.csv."""
-import copy, json, os, sys
+import re, copy, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
 import mockdata
@@ -24,7 +24,7 @@ READ = """() => {
 }"""
 
 class Page:
-    def __init__(self, browser, scenario="idle", overrides=None, config=None, width=900, lang="en", drop=(), extra=None, mutate=None, errors=None, include=(), height=1300):
+    def __init__(self, browser, scenario="idle", overrides=None, config=None, width=900, lang="en", drop=(), extra=None, mutate=None, errors=None, include=(), height=1300, themes=None):
         self.page = browser.new_page(viewport={"width": width + 40, "height": height})
         self.errors = errors if errors is not None else []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
@@ -39,12 +39,15 @@ class Page:
         for eid, st in (extra or {}).items(): self.states[eid] = st
         if mutate: mutate(self.states, self.entities)
         self.lang = lang
+        self.themes = themes
         self.config = config or {"type": "custom:nibe-plant-card"}
         self.page.evaluate("""([cfg, hass]) => { const el = document.createElement('nibe-plant-card'); document.getElementById('holder').appendChild(el); el.setConfig(cfg); el.hass = hass; window.__card = el; }""",
                            [self.config, self.hass()])
         self.page.wait_for_timeout(120)
     def hass(self):
-        return {"states": self.states, "entities": self.entities, "locale": {"language": self.lang}, "language": self.lang}
+        h = {"states": self.states, "entities": self.entities, "locale": {"language": self.lang}, "language": self.lang}
+        if self.themes is not None: h["themes"] = self.themes
+        return h
     def push(self, new_entities=None):
         if new_entities is not None: self.entities = new_entities
         self.page.evaluate("(h) => { window.__card.hass = h; }", self.hass()); self.page.wait_for_timeout(60)
@@ -778,6 +781,22 @@ with sync_playwright() as p:
         check(f"garbage states everywhere ({width} px): no errors, still renders", not errs and r["viewBox"] is not None, errs); pg.close()
     pg = Page(browser, "heating", config={"type": "custom:nibe-plant-card", "entities": {"outdoor": None, "supply": ""}, "pv": None, "tank": None, "circuit": None, "heatpump": None}, errors=errs)
     check("null / empty config sections are tolerated", not errs and pg.read()["viewBox"] == "0 0 980 560", errs); pg.close()
+
+    # ---- dark / light mode of the HA theme
+    FLOW_FILL = """() => { const r = [...window.__card.shadowRoot.querySelectorAll('.npc-readout')].find(r => r.querySelector('text').textContent === 'Flow');
+                           return getComputedStyle(r.querySelectorAll('text')[1]).fill; }"""
+    MODE = """() => { const c = window.__card.shadowRoot.querySelector('ha-card');
+                      return [c.classList.contains('npc-light'), c.classList.contains('npc-dark'), getComputedStyle(window.__card.shadowRoot.querySelector('.npc-insulation')).fill]; }"""
+    def lum(css):  # rough brightness of "rgb(r, g, b)" or "color(srgb r g b)" (what Chromium reports for color-mix)
+        v = [float(x) for x in re.findall(r"[\d.]+", css)[:3]]
+        return sum(w * x * (255 if css.startswith("color(") else 1) for w, x in zip((0.2126, 0.7152, 0.0722), v))
+    pg = Page(browser, "heating", errors=errs); plain = pg.page.evaluate(FLOW_FILL); plain_mode = pg.page.evaluate(MODE); pg.close()
+    pg = Page(browser, "heating", themes={"darkMode": True}, errors=errs); dark = pg.page.evaluate(FLOW_FILL); dark_mode = pg.page.evaluate(MODE)
+    pg.themes = {"darkMode": False}; pg.push(); light = pg.page.evaluate(FLOW_FILL); light_mode = pg.page.evaluate(MODE); pg.close()
+    check("without hass.themes the card marks no mode and keeps its colours", plain_mode[:2] == [False, False] and plain == dark, (plain_mode, plain, dark))
+    check("dark mode: npc-dark class and a solid (not see-through) tank insulation", dark_mode[:2] == [False, True] and dark_mode[2].startswith("rgb("), dark_mode)
+    check("switching HA to light mode marks the card npc-light on the next hass update", light_mode[:2] == [True, False], light_mode)
+    check("light mode darkens warm temperature text (about half the brightness)", lum(light) < 0.65 * lum(dark), (light, dark))
 
     check("no JavaScript errors in any test", not errs, errs)
     browser.close()
