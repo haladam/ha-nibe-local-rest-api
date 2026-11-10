@@ -109,6 +109,20 @@ reg2 = Registry(device=False); pkg.dr = types.SimpleNamespace(async_get=lambda h
 c = vcoord(VApi(1038)); asyncio.run(c._async_update_data())
 check("coordinator: device not in the registry yet (first start) -> no error, version still set", c.device_info["sw_version"] == "4.14" and reg2.updates == [])
 
+# 2026.8+ registries look the device up by one identifier inside our config entry (the old call is deprecated)
+class ScopedRegistry(Registry):
+    def __init__(self): super().__init__(); self.scoped = []
+    def async_get_device(self, identifiers=None, connections=None):
+        raise AssertionError("deprecated async_get_device used although async_get_device_by_identifier exists")
+    def async_get_device_by_identifier(self, identifier, config_entry_id):
+        self.scoped.append((identifier, config_entry_id)); return types.SimpleNamespace(id="dev1")
+reg3 = ScopedRegistry(); pkg.dr = types.SimpleNamespace(async_get=lambda hass: reg3)
+c = pkg.NibeCoordinator("HASS", types.SimpleNamespace(options={}, entry_id="E1"), VApi(1038),
+                        {"serial": "S", "name": "N", "manufacturer": "NIBE", "firmware": "nibe-n"})
+asyncio.run(c._async_update_data())
+check("coordinator: new registry -> device found by identifier scoped to this config entry, version written",
+      reg3.scoped == [(("nibe_local_api", "S"), "E1")] and reg3.updates == [("dev1", {"sw_version": "4.14"})], (reg3.scoped, reg3.updates))
+
 # ------------------------------------------------------------------ the sensor entity
 sc = sys.modules["homeassistant.components.sensor"]
 sc.SensorEntity = type("SensorEntity", (), {})

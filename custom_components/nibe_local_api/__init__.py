@@ -245,7 +245,13 @@ class NibeCoordinator(DataUpdateCoordinator[dict[int, dict]]):
         if previous:
             _LOGGER.info("Heat pump software changed from %s to %s", previous, version)
         registry = dr.async_get(self.hass)
-        device = registry.async_get_device(identifiers={(DOMAIN, self.serial)})
+        identifier = (DOMAIN, self.serial)
+        # 2026.8+: identifiers are only unique per config entry, so look the device up in ours.
+        # The old lookup is deprecated there (removed in 2027.8) but is all that older versions have.
+        if (by_identifier := getattr(registry, "async_get_device_by_identifier", None)) is not None:
+            device = by_identifier(identifier, self.config_entry.entry_id)
+        else:
+            device = registry.async_get_device(identifiers={identifier})
         if device:
             registry.async_update_device(device.id, sw_version=version)
 

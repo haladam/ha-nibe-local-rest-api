@@ -4,6 +4,13 @@ Newest first. The version in `custom_components/nibe_local_api/manifest.json` an
 card always match. Per-release notes before 0.9.7 were not kept, the entries below list what each
 release is known to have changed.
 
+## 0.14.4 - 2026-11-10
+
+* No more "calls `device_registry.async_get_device`, which is deprecated" warning on Home Assistant 2026.8
+  and later. When the heat pump's software version changes, the device is now looked up with
+  `async_get_device_by_identifier` inside the integration's own config entry (the old call stops working in
+  2027.8). Older Home Assistant versions keep using the old lookup.
+
 ## 0.14.3 - 2026-11-02
 
 * Card: follows Home Assistant's dark / light mode. In light mode the coloured temperature values are

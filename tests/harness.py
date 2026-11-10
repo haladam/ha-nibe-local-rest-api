@@ -34,7 +34,7 @@ class UpdateFailed(Exception): pass
 
 class DataUpdateCoordinator(Generic[T]):
     def __init__(self, hass, logger, *, name=None, config_entry=None, update_interval=None):
-        self.hass, self.data = hass, None
+        self.hass, self.data, self.config_entry = hass, None, config_entry
         self.refreshes = 0; self.listener_updates = 0; self._listeners = {}
     async def async_request_refresh(self): self.refreshes += 1
     def async_add_listener(self, update_callback, context=None):
